@@ -8,17 +8,6 @@ venv/
 .env/
 env/
 
-models/bge_model/*
-models/my_bge_model/*
-models/bge_reranker_model/*
-models/my_bge_model/*
-
-# Data & models
-data/raw/*
-data/processed/*
-!data/.gitkeep
-reports/*
-
 # OS/editor
 .DS_Store
 .vscode/
