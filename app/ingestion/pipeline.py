@@ -1,10 +1,10 @@
-from app.parser.pdf_parser import parse_pdf
-from app.parser.table_parser import extract_tables
+from app.parser.parser_router import parse_document
+from app.parser.table_router import get_tables
 
 def process_pdf(file_path):
-    parsed = parse_pdf(file_path)
+    parsed = parse_document(file_path)
 
-    tables = extract_tables(file_path)
+    tables = get_tables(file_path, parsed)
 
     return {
         "titles": parsed["titles"],
