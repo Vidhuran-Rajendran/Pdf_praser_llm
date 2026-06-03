@@ -2,3 +2,10 @@ fastapi
 uvicorn
 pandas
 numpy
+"unstructured[pdf]"
+docling
+
+
+#pro
+llama-index
+llama-parse
