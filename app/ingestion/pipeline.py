@@ -1,10 +1,13 @@
 from app.parser.pdf_parser import parse_pdf
-
-# def process_pdf(file_path):
-#     elements = parse_pdf(file_path)
-    
-#     return{"elements": elements}
+from app.parser.table_parser import extract_tables
 
 def process_pdf(file_path):
-    structured = parse_pdf(file_path)
-    return structured
+    parsed = parse_pdf(file_path)
+
+    tables = extract_tables(file_path)
+
+    return {
+        "titles": parsed["titles"],
+        "text": parsed["text"],
+        "tables": tables
+    }
