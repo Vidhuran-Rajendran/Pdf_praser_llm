@@ -3,11 +3,11 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.venv/
-venv/
-.env/
-env/
 
+.eenv/
+eenv/
+.model/
+model/
 # OS/editor
 .DS_Store
 .vscode/

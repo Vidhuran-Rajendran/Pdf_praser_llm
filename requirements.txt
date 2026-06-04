@@ -2,12 +2,13 @@ fastapi
 uvicorn
 pandas
 numpy
-"unstructured[pdf]"
+#"unstructured[pdf]"
 docling
 pymupdf
 chromadb
 sentence-transformers
 pdfplumber
+duckdb
 
 #pro
 llama-index
