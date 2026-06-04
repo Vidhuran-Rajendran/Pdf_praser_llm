@@ -4,7 +4,10 @@ pandas
 numpy
 "unstructured[pdf]"
 docling
-
+pymupdf
+chromadb
+sentence-transformers
+pdfplumber
 
 #pro
 llama-index
