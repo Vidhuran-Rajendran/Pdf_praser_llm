@@ -1,5 +1,5 @@
 from app.config import MODE
-from app.parser.pdf_plumber_table import extract_tables_pdf
+from app.parser.pdfplumber_table import extract_tables_pdf
 from app.parser.gcp_table_parser import gcp_table_extract
 
 
