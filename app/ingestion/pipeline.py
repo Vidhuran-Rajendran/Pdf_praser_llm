@@ -4,6 +4,8 @@ from app.parser.table_normalizer import normalize_tables
 from app.parser.quality_scorer import filter_useful_tables
 from app.embeddings.chunker import dataframe_to_chunks
 from app.embeddings.vectordb import store_chunks
+from app.storage.duckdb_store import initialize_db,insert_chunks
+
 
 
 def process_pdf(file_path):
@@ -18,6 +20,9 @@ def process_pdf(file_path):
         chunks = dataframe_to_chunks(table)
         all_chunks.extend(chunks)
     store_chunks(all_chunks)
+    
+    initialize_db()
+    insert_chunks(all_chunks)
 
     return {
         "pages": pages,
