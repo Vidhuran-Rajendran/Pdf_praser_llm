@@ -1,6 +1,15 @@
-from app.query.semantic_search import semantic_search
-from app.query.keyword_search import keyword_search
-from app.reranker.reranker import rerank_results
+from app.query.semantic_search import (
+    semantic_search
+)
+
+from app.query.keyword_search import (
+    keyword_search
+)
+
+from app.reranker.rerank import (
+    rerank_results
+)
+
 
 def hybrid_search(query):
 
@@ -8,12 +17,27 @@ def hybrid_search(query):
         query,
         top_k=10
     )
-    semantic = dict(semantic)
 
     semantic_docs = []
 
-    docs = semantic["documents"][0]
-    metas = semantic["metadatas"][0]
+    # semantic may be None or may not contain expected keys; guard safely
+    if semantic and isinstance(semantic, dict):
+        docs = semantic.get("documents")
+        metas = semantic.get("metadatas")
+
+        # documents/metadatas expected to be lists of lists; try to extract first inner list
+        if docs and isinstance(docs, list):
+            docs = docs[0] if len(docs) > 0 and isinstance(docs[0], list) else docs
+        else:
+            docs = []
+
+        if metas and isinstance(metas, list):
+            metas = metas[0] if len(metas) > 0 and isinstance(metas[0], list) else metas
+        else:
+            metas = []
+    else:
+        docs = []
+        metas = []
 
     for doc, meta in zip(docs, metas):
 
@@ -41,4 +65,5 @@ def hybrid_search(query):
         final_docs
     )
 
-    return reranked[:5]
+    # ✅ MUST RETURN LIST
+    return list(reranked[:5])

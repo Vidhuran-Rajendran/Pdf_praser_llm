@@ -3,7 +3,8 @@ uvicorn
 pandas
 numpy
 ollama
-
+langgraph 
+langchain
 #"unstructured[pdf]"
 docling
 pymupdf
