@@ -20,9 +20,14 @@ def dataframe_to_chunks(table):
         chunks.append({
             "id": f"{table_id}_row_{idx}",
             "text": text,
+
             "metadata": {
                 "page": page,
-                "table_id": table_id
+                "table_id": table_id,
+
+                # ✅ searchable metadata
+                "row_index": idx,
+                "source": "table"
             }
         })
 
