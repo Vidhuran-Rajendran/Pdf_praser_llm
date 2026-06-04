@@ -1,11 +1,19 @@
-from app.query.hybrid_search import hybrid_search
+from app.query.hybrid_search import (
+    hybrid_search
+)
 
 results = hybrid_search(
     "front pad maximum temperature"
 )
 
-print("\n=== SEMANTIC ===\n")
-print(results["semantic_results"])
+print("\n=== RESULTS ===\n")
 
-print("\n=== KEYWORD ===\n")
-print(results["keyword_results"])
+for r in results:
+
+    print("SOURCE:", r["source"])
+    print("PAGE:", r["metadata"]["page"])
+    print("RERANK:", r["rerank_score"])
+
+    print(r["document"])
+
+    print("\n-------------------\n")

@@ -3,6 +3,7 @@ from app.embeddings.embedder import create_embedding
 
 
 def semantic_search(query, top_k=5):
+
     query_embedding = create_embedding(query)
 
     results = collection.query(
