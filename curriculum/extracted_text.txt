@@ -1,0 +1,10208 @@
+
+--- START OF FILE: merged_output.pdf ---
+
+Perfect    — let’s rebuild Day 1 using YOUR current template + final architecture direction (pymupdf 
++ pdfplumber ready) 
+     This is clean, production-compatible Day 1 (no rework later) 
+ 
+           DAY 1 — PROJECT FOUNDATION (FINAL VERSION) 
+ 
+          GOAL (Day 1) 
+✔ Setup repo 
+✔ Setup folder structure (correct for future) 
+✔ Setup config (free/paid toggle) 
+✔ Setup API base 
+✔ Prepare for Day 2/3 (parser ready) 
+ 
+      FINAL FOLDER STRUCTURE (CREATE EXACT) 
+project_root/ 
+│ 
+├── app/ 
+│   ├── config.py    
+│ 
+│   ├── api/ 
+│   │   └── main.py    
+│ 
+│   ├── ingestion/ 
+│   │   └── pipeline.py    
+│ 
+│   ├── parser/ 
+│   │   ├── parser_router.py    
+│   │   ├── table_router.py    
+│   │   ├── pymupdf_parser.py   (Day 2) 
+│   │   ├── pdfplumber_table.py   (Day 3) 
+│   │   ├── gcp_parser.py    stub 
+│   │   ├── gcp_table_parser.py    stub 
+│ 
+│   ├── schema/ 
+│   │   ├── models.py    
+│   │   ├── mapper.py    
+│ 
+│   ├── storage/ 
+│   │   └── db.py    
+│ 
+│   ├── query/   (later) 
+│   ├── agent/   (later) 
+│   ├── models/   (later) 
+│ 
+├── tests/ 
+│   └── test_ingestion.py    
+│ 
+├── data/ 
+├── requirements.txt    
+└── .env 
+ 
+      STEP 1 — ENV SETUP 
+python -m venv venv 
+source venv/bin/activate   # or Windows 
+pip install fastapi uvicorn pymupdf pdfplumber duckdb pandas 
+ 
+      STEP 2 — CONFIG (VERY IMPORTANT) 
+     app/config.py 
+MODE = "free"   # change to "paid" later 
+ 
+      STEP 3 — API BASE 
+     app/api/main.py 
+from fastapi import FastAPI 
+ 
+app = FastAPI() 
+ 
+@app.get("/") 
+def health(): 
+    return {"status": "ok"} 
+ 
+   RUN 
+uvicorn app.api.main:app --reload 
+ 
+      STEP 4 — PARSER ROUTER (FUTURE READY) 
+     app/parser/parser_router.py 
+from app.config import MODE 
+ 
+def parse_document(file_path): 
+    if MODE == "paid": 
+        from app.parser.gcp_parser import parse_gcp 
+        return parse_gcp(file_path) 
+ 
+    # Day 2 will plug pymupdf here 
+    return { 
+        "titles": [], 
+        "text": [] 
+    } 
+ 
+      STEP 5 — TABLE ROUTER (FUTURE READY) 
+     app/parser/table_router.py 
+from app.config import MODE 
+ 
+def get_tables(file_path, parsed): 
+    if MODE == "paid": 
+        from app.parser.gcp_table_parser import gcp_table_extract 
+        return gcp_table_extract(file_path) 
+ 
+    # Day 3 will plug pdfplumber here 
+    return [] 
+ 
+      STEP 6 — PIPELINE (CORE FLOW) 
+     app/ingestion/pipeline.py 
+from app.parser.parser_router import parse_document 
+from app.parser.table_router import get_tables 
+ 
+def process_pdf(file_path): 
+    parsed = parse_document(file_path) 
+ 
+    tables = get_tables(file_path, parsed) 
+ 
+    return { 
+        "titles": parsed.get("titles" , []), 
+        "text": parsed.get("text" , []), 
+        "tables": tables 
+    } 
+ 
+      STEP 7 — STORAGE BASE (DuckDB) 
+     app/storage/db.py 
+import duckdb 
+ 
+conn = duckdb.connect("data.db") 
+ 
+conn.execute(""" 
+CREATE TABLE IF NOT EXISTS metrics ( 
+    component TEXT, 
+    value FLOAT, 
+    condition TEXT 
+) 
+""") 
+ 
+      STEP 8 — SCHEMA (INITIAL ONLY) 
+     app/schema/models.py 
+def create_record(component, value, condition): 
+    return { 
+        "component": component, 
+        "value": value, 
+        "condition": condition 
+    } 
+ 
+      STEP 9 — TEST FILE 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+print("\n=== OUTPUT ===\n") 
+print(result) 
+ 
+      STEP 10 — REQUIREMENTS FILE 
+     requirements.txt 
+fastapi 
+uvicorn 
+pymupdf 
+pdfplumber 
+duckdb 
+pandas 
+ 
+      DAY 1 OUTPUT (EXPECTED) 
+Run: 
+python -m tests.test_ingestion 
+     Output: 
+{ 
+  "titles": [], 
+  "text": [], 
+  "tables": [] 
+} 
+   THIS IS CORRECT FOR DAY 1 
+ 
+      WHERE YOU ARE AFTER DAY 1 
+Infra    
+Router    
+Pipeline    
+Storage    
+Parser   (next) 
+Tables   (next) 
+Schema   (next) 
+ 
+      WHAT COMES NEXT 
+        Day 2: 
+pymupdf (text extraction) 
+        Day 3: 
+pdfplumber (table extraction + cleaning) 
+ 
+      FINAL MESSAGE 
+     This Day 1 is: 
+✔ aligned with your architecture    
+✔ ready for real parser    
+✔ supports FREE + PAID    
+✔ no rework later    
+ 
+   Say Day 2         
+ 
+Perfect    — here is DAY 2 (FINAL, CORRECT, aligned with your working pdfplumber flow + template) 
+     Focus = ONLY TEXT EXTRACTION (PyMuPDF) 
+     No tables yet (Day 3) 
+ 
+           DAY 2 — TEXT EXTRACTION (PyMuPDF) 
+ 
+          WHERE WE ARE 
+Day 1    Infra ready 
+Day 2 ← YOU ARE HERE 
+Tables   (next) 
+Schema   
+ 
+          GOAL 
+PDF → clean text + titles    
+ 
+      FILES TO MODIFY 
+app/parser/ 
+  ├── parser_router.py    modify 
+  ├── pymupdf_parser.py    create 
+ 
+      STEP 1 — INSTALL (if not done) 
+pip install pymupdf 
+ 
+      STEP 2 — CREATE TEXT PARSER 
+     app/parser/pymupdf_parser.py 
+import fitz  # PyMuPDF 
+ 
+def parse_pymupdf(file_path): 
+    doc = fitz.open(file_path) 
+ 
+    titles = [] 
+    text = [] 
+ 
+    for page_num, page in enumerate(doc): 
+        content = page.get_text() 
+ 
+        if not content: 
+            continue 
+ 
+        lines = content.split("\n") 
+ 
+        for line in lines: 
+            line = line.strip() 
+ 
+            if not line: 
+                continue 
+ 
+            #    Title detection (important) 
+            if ( 
+                line.isupper() or 
+                "TEST REPORT" in line or 
+                "BRAKE" in line 
+            ): 
+                titles.append(line) 
+            else: 
+                text.append(line) 
+ 
+    return { 
+        "titles": titles, 
+        "text": text 
+    } 
+ 
+      STEP 3 — UPDATE ROUTER 
+     app/parser/parser_router.py 
+from app.config import MODE 
+from app.parser.pymupdf_parser import parse_pymupdf 
+from app.parser.gcp_parser import parse_gcp 
+ 
+def parse_document(file_path): 
+    if MODE == "paid": 
+        return parse_gcp(file_path) 
+ 
+    #    FREE MODE 
+    return parse_pymupdf(file_path) 
+ 
+      STEP 4 — PIPELINE (NO CHANGE) 
+     already correct: 
+parsed = parse_document(file_path) 
+ 
+      STEP 5 — TEST 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+print("\n=== TITLES ===\n" , result["titles"][:10]) 
+print("\n=== TEXT ===\n" , result["text"][:20]) 
+ 
+      EXPECTED OUTPUT 
+ 
+   TITLES 
+TPDS TEST REPORT    
+BRAKE THERMAL MAPPING    
+VEHICLE CONFIGURATION    
+ 
+   TEXT 
+Objective: To evaluate brake thermal mapping    
+Booster Size 9"    
+Front Brake Pad Grade Apache    
+ 
+      VERIFY (VERY IMPORTANT) 
+   You should see: 
+   100+ text lines (not empty) 
+   meaningful engineering text 
+   titles separated 
+ 
+  If you see: 
+[] empty   
+     then PyMuPDF not working 
+ 
+      FINAL STATE AFTER DAY 2 
+Text    
+Titles    
+Parser    (stable) 
+Tables   (next day) 
+ 
+      WHY THIS STEP MATTERS 
+     This text will later give: 
+✔ metadata (component, dvp) 
+✔ fallback when tables fail 
+✔ context for LLM 
+ 
+      NEXT 
+     DAY 3 (IMPORTANT) 
+pdfplumber tables + None cleaning (your breakthrough) 
+ 
+   Say: 
+Day 3 
+We’ll plug your working table extraction properly into system         
+ 
+   DAY 3 (MODIFIED FINAL VERSION) 
+     Goal: 
+PDF → Page-wise structured content 
+(Text + Tables + Page info) 
+ 
+   FILES 
+app/parser/ 
+  ├── pymupdf_parser.py 
+  ├── pdfplumber_table.py 
+  ├── page_builder.py      NEW 
+ 
+app/ingestion/ 
+  ├── pipeline.py 
+ 
+   app/parser/pymupdf_parser.py 
+import fitz 
+ 
+def parse_pymupdf(file_path): 
+    doc = fitz.open(file_path) 
+ 
+    pages = [] 
+ 
+    for i in range(doc.page_count): 
+        page = doc.load_page(i) 
+ 
+        text_lines = str( 
+            page.get_text("text") or "" 
+        ).splitlines() 
+ 
+        cleaned = [] 
+ 
+        for line in text_lines: 
+            line = line.strip() 
+ 
+            if line: 
+                cleaned.append(line) 
+ 
+        pages.append({ 
+            "page": i, 
+            "text": cleaned 
+        }) 
+ 
+    return pages 
+ 
+   app/parser/pdfplumber_table.py 
+import pdfplumber 
+ 
+def clean_row(row): 
+    return [ 
+        cell.strip() 
+        for cell in row 
+        if cell not in (None, "" , " ") 
+    ] 
+ 
+def extract_tables_pdf(file_path): 
+    tables = [] 
+ 
+    with pdfplumber.open(file_path) as pdf: 
+ 
+        for page_num, page in enumerate(pdf.pages): 
+ 
+            raw_tables = page.extract_tables() 
+ 
+            if not raw_tables: 
+                continue 
+ 
+            for table_id, table in enumerate(raw_tables): 
+ 
+                cleaned_table = [] 
+ 
+                for row in table: 
+                    cleaned = clean_row(row) 
+ 
+                    if len(cleaned) >= 2: 
+                        cleaned_table.append(cleaned) 
+ 
+                if len(cleaned_table) < 2: 
+                    continue 
+ 
+                tables.append({ 
+                    "page": page_num, 
+                    "table_id": f"page_{page_num}table{table_id}" , 
+                    "data": cleaned_table 
+                }) 
+ 
+                print(f"   Table extracted from page {page_num}") 
+ 
+    return tables 
+ 
+   app/parser/page_builder.py 
+from app.parser.pymupdf_parser import parse_pymupdf 
+from app.parser.pdfplumber_table import extract_tables_pdf 
+ 
+def build_page_view(file_path): 
+ 
+    parsed_pages = parse_pymupdf(file_path) 
+ 
+    extracted_tables = extract_tables_pdf(file_path) 
+ 
+    table_map = {} 
+ 
+    for t in extracted_tables: 
+        page = t["page"] 
+ 
+        if page not in table_map: 
+            table_map[page] = [] 
+ 
+        table_map[page].append(t) 
+ 
+    final_pages = [] 
+ 
+    for p in parsed_pages: 
+ 
+        page_num = p["page"] 
+ 
+        final_pages.append({ 
+            "page": page_num, 
+            "text": p["text"], 
+            "tables": table_map.get(page_num, []) 
+        }) 
+ 
+    return final_pages 
+ 
+   app/ingestion/pipeline.py 
+from app.parser.page_builder import build_page_view 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    return { 
+        "pages": pages 
+    } 
+ 
+   tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+for page in result["pages"]: 
+ 
+    print(f"\n========== PAGE {page['page']} ==========\n") 
+ 
+    print("TEXT:\n") 
+ 
+    for line in page["text"][:10]: 
+        print(line) 
+ 
+    print("\nTABLES:\n") 
+ 
+    for table in page["tables"]: 
+ 
+        print("TABLE ID:" , table["table_id"]) 
+ 
+        for row in table["data"][:10]: 
+            print(row) 
+ 
+        print("------") 
+ 
+   OUTPUT YOU SHOULD GET 
+========== PAGE 0 ========== 
+ 
+TEXT: 
+TPDS 
+TEST REPORT 
+Objective: 
+... 
+ 
+TABLES: 
+ 
+TABLE ID: page_0_table_0 
+ 
+['P201 BRAKE TEMPERATURE MAPPING' , 'CDT' , 'GHD' , 'HSD'] 
+['Distance Covered (km)' , '149' , '243' , '264'] 
+['Front pad peak temperature' , '163' , '179' , '188'] 
+ 
+   WHAT DAY 3 ACHIEVES 
+✔ page-wise structure 
+✔ table-wise structure 
+✔ table_id 
+✔ page tracking 
+✔ clean extraction 
+✔ ready for normalization 
+ 
+   NEXT = DAY 4 
+     Day 4 will convert this: 
+['Front pad peak temperature' , '163' , '179' , '188'] 
+into: 
+{ 
+  "metric": "Front pad peak temperature" , 
+  "CDT": 163, 
+  "GHD": 179, 
+  "HSD": 188 
+} 
+and also: 
+table_type 
+source_pdf 
+metadata 
+normalized columns 
+        
+ 
+        DAY 4 — FINAL GENERIC TABLE RECONSTRUCTION (YOUR TEMPLATE) 
+   GOAL 
+PDF 
+↓ 
+Extract ALL tables 
+↓ 
+Preserve ALL rows/columns 
+↓ 
+No hardcoding 
+↓ 
+No table-specific logic 
+↓ 
+Keep merged/split cells as-is 
+ 
+   DAY 4 STATUS 
+At this stage you already have: 
+   PyMuPDF text extraction 
+   pdfplumber table extraction 
+   page-wise extraction 
+   all tables detected 
+   all pages processed 
+Day 4 focuses ONLY on: 
+   generic table preservation 
+   dataframe reconstruction 
+   no data loss 
+`` 
+ 
+   FINAL TEMPLATE STRUCTURE 
+app/ 
+├── parser/ 
+│   ├── pymupdf_parser.py 
+│   ├── pdfplumber_table.py    
+│   ├── page_builder.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    
+│ 
+├── tests/ 
+│   ├── test_ingestion.py    
+ 
+   app/parser/pdfplumber_table.py 
+import pdfplumber 
+import pandas as pd 
+ 
+def extract_tables_pdf(pdf_path): 
+ 
+    tables = [] 
+ 
+    with pdfplumber.open(pdf_path) as pdf: 
+ 
+        for page_num, page in enumerate(pdf.pages): 
+ 
+            raw_tables = page.extract_tables() 
+ 
+            if not raw_tables: 
+                continue 
+ 
+            for table_id, table in enumerate(raw_tables): 
+ 
+                df = pd.DataFrame(table) 
+ 
+                #    remove fully empty rows 
+                df = df.dropna(axis=0, how="all") 
+ 
+                #    remove fully empty columns 
+                df = df.dropna(axis=1, how="all") 
+ 
+                #    preserve merged/split cells 
+                df = df.fillna(None) 
+ 
+                tables.append({ 
+                    "page": page_num, 
+                    "table_id": f"page_{page_num}table{table_id}" , 
+                    "df": df 
+                }) 
+ 
+                print(f"   Table extracted from page {page_num}") 
+ 
+    return tables 
+ 
+   app/parser/pymupdf_parser.py 
+import fitz 
+ 
+def parse_pymupdf(file_path): 
+ 
+    doc = fitz.open(file_path) 
+ 
+    pages = [] 
+ 
+    for i in range(doc.page_count): 
+ 
+        page = doc.load_page(i) 
+ 
+        text_lines = str( 
+            page.get_text("text") or "" 
+        ).splitlines() 
+ 
+        cleaned = [] 
+ 
+        for line in text_lines: 
+ 
+            line = line.strip() 
+ 
+            if line: 
+                cleaned.append(line) 
+ 
+        pages.append({ 
+            "page": i, 
+            "text": cleaned 
+        }) 
+ 
+    return pages 
+`` 
+ 
+   app/parser/page_builder.py 
+from app.parser.pymupdf_parser import parse_pymupdf 
+ 
+def build_page_view(file_path): 
+ 
+    parsed_pages = parse_pymupdf(file_path) 
+ 
+    final_pages = [] 
+ 
+    for p in parsed_pages: 
+ 
+        final_pages.append({ 
+            "page": p["page"], 
+            "text": p["text"] 
+        }) 
+ 
+    return final_pages 
+ 
+   app/ingestion/pipeline.py 
+from app.parser.page_builder import build_page_view 
+from app.parser.pdfplumber_table import extract_tables_pdf 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    tables = extract_tables_pdf(file_path) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": tables 
+    } 
+ 
+   tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+ 
+   WHAT DAY 4 ACHIEVES 
+   ALL pages extracted 
+   ALL tables preserved 
+   ALL columns preserved 
+   ALL rows preserved 
+   merged cells preserved 
+   split cells preserved 
+   generic extraction 
+   no hardcoding 
+   works for ANY PDF 
+ 
+   IMPORTANT DESIGN DECISION 
+Day 4 does NOT try to: 
+  interpret table meaning 
+  repair merged layouts 
+  infer headers 
+  force schema 
+Because that belongs to: 
+DAY 5 → semantic/schema layer 
+ 
+   CURRENT OUTPUT (CORRECT FOR DAY 4) 
+TABLE: page_0_table_1 
+ 
+P201 BRAKE TEMPERATURE MAPPING | CDT | GHD | HSD | None 
+ 
+Front pad peak temperature | Average | 104 | 104 | 82 
+Maximum                    | 163     | 179 | 188 | None 
+   This is GOOD extraction output. 
+   No data loss. 
+   Structure preserved. 
+   Ready for semantic interpretation later. 
+ 
+   YOU ARE NOW HERE 
+   DAY 4 COMPLETE 
+Next: 
+DAY 5 
+→ semantic schema layer 
+→ metadata 
+→ DuckDB 
+→ analytics-ready structure 
+ 
+        DAY 5 — GENERIC STRUCTURAL SEGMENTATION + SEMANTIC PROPAGATION 
+   GOAL 
+Move from: 
+hardcoded anchors   
+to: 
+layout intelligence    
+ 
+   DAY 5 ARCHITECTURE 
+RAW TABLE 
+   ↓ 
+Row profiling 
+   ↓ 
+Structural segmentation 
+   ↓ 
+Semantic propagation 
+   ↓ 
+Clean logical tables 
+`` 
+ 
+   WHAT DAY 5 SOLVES 
+   merged rows 
+   split cells 
+   logical table separation 
+   sparse engineering layouts 
+   side-by-side sections 
+   generic PDFs 
+   no anchors 
+   no hardcoding 
+`` 
+ 
+   YOUR TEMPLATE 
+app/ 
+├── parser/ 
+│   ├── pdfplumber_table.py 
+│   ├── table_segmenter.py    NEW 
+│   ├── semantic_propagator.py    NEW 
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+│ 
+├── tests/ 
+│   ├── test_ingestion.py 
+ 
+   STEP 1 — TABLE SEGMENTER 
+     app/parser/table_segmenter.py 
+import pandas as pd 
+ 
+def get_row_profile(row): 
+ 
+    values = [ 
+        str(x).strip() 
+        for x in row 
+    ] 
+ 
+    numeric_count = 0 
+    text_count = 0 
+    empty_count = 0 
+ 
+    for v in values: 
+ 
+        if v.lower() in ["" , "nan" , "none"]: 
+            empty_count += 1 
+ 
+        elif any(c.isdigit() for c in v): 
+            numeric_count += 1 
+ 
+        else: 
+            text_count += 1 
+ 
+    populated = len(values) - empty_count 
+ 
+    return { 
+        "numeric": numeric_count, 
+        "text": text_count, 
+        "empty": empty_count, 
+        "populated": populated 
+    } 
+ 
+   STEP 2 — GENERIC SEGMENTATION 
+def segment_dataframe(df): 
+ 
+    segments = [] 
+ 
+    current = [] 
+ 
+    previous_profile = None 
+ 
+    for _, row in df.iterrows(): 
+ 
+        row_values = list(row) 
+ 
+        profile = get_row_profile(row_values) 
+ 
+        #    detect structural discontinuity 
+        split_condition = False 
+ 
+        if previous_profile: 
+ 
+            diff = abs( 
+                profile["populated"] - 
+                previous_profile["populated"] 
+            ) 
+ 
+            #    sudden structure shift 
+            if diff >= 3: 
+                split_condition = True 
+ 
+        if split_condition and current: 
+ 
+            segments.append( 
+                pd.DataFrame(current) 
+            ) 
+ 
+            current = [] 
+ 
+        current.append(row_values) 
+ 
+        previous_profile = profile 
+ 
+    if current: 
+        segments.append( 
+            pd.DataFrame(current) 
+        ) 
+ 
+    return segments 
+ 
+   STEP 3 — SEMANTIC PROPAGATION 
+     app/parser/semantic_propagator.py 
+import pandas as pd 
+ 
+def propagate_semantic_rows(df): 
+ 
+    if len(df.columns) == 0: 
+        return df 
+ 
+    first_col = df.iloc[:, 0] 
+ 
+    propagated = [] 
+ 
+    previous_value = None 
+ 
+    for val in first_col: 
+ 
+        val_str = str(val).strip() 
+ 
+        #    semantic parent row 
+        if ( 
+            val_str.lower() not in 
+            ["" , "nan" , "none"] 
+        ): 
+ 
+            previous_value = val 
+ 
+            propagated.append(val) 
+ 
+        else: 
+ 
+            propagated.append(previous_value) 
+ 
+    df.iloc[:, 0] = propagated 
+ 
+    return df 
+ 
+   STEP 4 — MAIN NORMALIZER 
+     app/parser/table_normalizer.py 
+import pandas as pd 
+ 
+from app.parser.table_segmenter import ( 
+    segment_dataframe 
+) 
+ 
+from app.parser.semantic_propagator import ( 
+    propagate_semantic_rows 
+) 
+ 
+def normalize_tables(tables): 
+ 
+    final_tables = [] 
+ 
+    for t in tables: 
+ 
+        df = t["df"] 
+ 
+        #    clean only fully empty rows/cols 
+        df = df.dropna(axis=0, how="all") 
+        df = df.dropna(axis=1, how="all") 
+ 
+        #    preserve structure 
+        df = df.fillna(None) 
+ 
+        #    segment logically 
+        segments = segment_dataframe(df) 
+ 
+        for idx, seg in enumerate(segments): 
+ 
+            #    semantic propagation 
+            seg = propagate_semantic_rows(seg) 
+ 
+            final_tables.append({ 
+                "table_id": 
+                    f"{t['table_id']}segment{idx}" , 
+ 
+                "page": t["page"], 
+ 
+                "df": seg 
+            }) 
+ 
+    return final_tables 
+ 
+   STEP 5 — PIPELINE 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    tables = extract_tables_pdf(file_path) 
+ 
+    normalized_tables = normalize_tables( 
+        tables 
+    ) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": normalized_tables 
+    } 
+ 
+   STEP 6 — TEST 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+ 
+   WHAT THIS DAY 5 ACHIEVES 
+   generic segmentation 
+   structure-aware splitting 
+   semantic propagation 
+   no anchors 
+   no thermal hardcoding 
+   no table-name assumptions 
+   merged-row recovery 
+   sparse-layout handling 
+   works for engineering PDFs 
+ 
+   IMPORTANT SHIFT 
+You are no longer building: 
+table extractor 
+You are now building: 
+layout-aware document intelligence pipeline    
+ 
+   YOU ARE NOW HERE 
+   DAY 5 COMPLETE 
+`` 
+Next: 
+DAY 6 
+→ schema layer 
+→ metadata extraction 
+→ DuckDB 
+→ analytics-ready records 
+ 
+        DAY 6 — FINAL CLEAN GENERIC FILTERING LAYER (YOUR TEMPLATE) 
+   GOAL 
+Move from: 
+RAW extracted tables    
+to: 
+clean retrieval-ready tables    
+WITHOUT: 
+• hardcoding   
+• anchors   
+• thermal-specific logic   
+• modifying raw extraction   
+ 
+   WHAT DAY 6 DOES 
+   removes fully empty rows 
+   removes fully empty columns 
+   removes useless single-row tables 
+   removes useless single-column tables 
+   preserves all real data 
+   keeps extraction generic 
+   improves future LLM retrieval quality 
+ 
+   FINAL TEMPLATE STRUCTURE 
+app/ 
+├── parser/ 
+│   ├── pdfplumber_table.py 
+│   ├── table_segmenter.py 
+│   ├── semantic_propagator.py 
+│   ├── table_normalizer.py 
+│   ├── quality_scorer.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    
+│ 
+├── tests/ 
+│   ├── test_ingestion.py    
+ 
+   STEP 1 — quality_scorer.py 
+     app/parser/quality_scorer.py 
+import pandas as pd 
+ 
+def filter_useful_tables(tables): 
+ 
+    useful = [] 
+ 
+    for t in tables: 
+ 
+        df = t["df"].copy() 
+ 
+        #    normalize empty values 
+        df = df.map( 
+            lambda x: pd.NA 
+            if str(x).strip().lower() 
+            in ["nan" , "none" , ""] 
+            else x 
+        ) 
+ 
+        #    remove fully empty columns 
+        df = df.dropna(axis=1, how="all") 
+ 
+        #    remove fully empty rows 
+        df = df.dropna(axis=0, how="all") 
+ 
+        rows, cols = df.shape 
+ 
+        #    skip useless tiny tables 
+        if rows <= 1: 
+            continue 
+ 
+        if cols <= 1: 
+            continue 
+ 
+        #    update cleaned dataframe 
+        t["df"] = df 
+ 
+        useful.append(t) 
+ 
+    return useful 
+ 
+   STEP 2 — UPDATE pipeline.py 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+from app.parser.quality_scorer import ( 
+    filter_useful_tables 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    #    page text 
+    pages = build_page_view(file_path) 
+ 
+    #    raw table extraction 
+    raw_tables = extract_tables_pdf(file_path) 
+ 
+    #    structural normalization 
+    normalized_tables = normalize_tables( 
+        raw_tables 
+    ) 
+ 
+    #    final retrieval-ready filtering 
+    useful_tables = filter_useful_tables( 
+        normalized_tables 
+    ) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": useful_tables 
+    } 
+ 
+   STEP 3 — FINAL TEST FILE 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+`` 
+ 
+   WHAT THIS FINAL DAY 6 FIXES 
+   Before 
+0 1 2 3 4 5 6 7 8 
+NaN NaN NaN everywhere 
+tiny useless tables 
+ 
+   After 
+   only meaningful rows 
+   only meaningful columns 
+   all real data preserved 
+   cleaner dataframe 
+   retrieval-ready tables 
+ 
+   IMPORTANT DESIGN DECISION 
+Extraction Layer 
+preserve everything    
+`` 
+Filtering Layer 
+clean retrieval noise    
+`` 
+This separation is correct architecture. 
+ 
+   CURRENT PIPELINE (NOW GOOD) 
+PDF 
+↓ 
+PyMuPDF text extraction    
+↓ 
+pdfplumber table extraction    
+↓ 
+structural segmentation    
+↓ 
+semantic propagation    
+↓ 
+retrieval filtering    
+↓ 
+LLM-ready tables    
+ 
+   YOU ARE NOW HERE 
+   DAY 6 COMPLETE 
+Next: 
+DAY 7 
+→ embeddings 
+→ ChromaDB 
+→ semantic retrieval 
+→ RAG pipeline 
+ 
+        DAY 7 — EMBEDDINGS + CHROMADB + SEMANTIC RETRIEVAL 
+   GOAL 
+Move from: 
+clean tables    
+to: 
+semantic searchable engineering knowledge base    
+ 
+   DAY 7 ARCHITECTURE 
+PDF 
+↓ 
+Tables 
+↓ 
+Clean tables 
+↓ 
+Chunking 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Semantic Search 
+ 
+   WHAT DAY 7 ADDS 
+   embedding generation 
+   ChromaDB vector store 
+   chunk creation 
+   semantic retrieval 
+   similarity search 
+   engineering query search 
+   RAG foundation 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── embeddings/ 
+│   ├── embedder.py    
+│   ├── chunker.py    
+│   ├── vectordb.py    
+│ 
+├── query/ 
+│   ├── semantic_search.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+ 
+   STEP 1 — INSTALL 
+pip install chromadb sentence-transformers 
+ 
+   STEP 2 — CHUNKER 
+     app/embeddings/chunker.py 
+def dataframe_to_chunks(table): 
+ 
+    chunks = [] 
+ 
+    df = table["df"] 
+ 
+    page = table["page"] 
+ 
+    table_id = table["table_id"] 
+ 
+    for idx, row in df.iterrows(): 
+ 
+        values = [ 
+            str(v) 
+            for v in row.values 
+        ] 
+ 
+        text = " | " .join(values) 
+ 
+        chunks.append({ 
+            "id": f"{table_id}row{idx}" , 
+            "text": text, 
+            "metadata": { 
+                "page": page, 
+                "table_id": table_id 
+            } 
+        }) 
+ 
+    return chunks 
+ 
+   STEP 3 — EMBEDDER 
+     app/embeddings/embedder.py 
+from sentence_transformers import ( 
+    SentenceTransformer 
+) 
+ 
+model = SentenceTransformer( 
+    "all-MiniLM-L6-v2" 
+) 
+ 
+def create_embedding(text): 
+ 
+    return model.encode(text).tolist() 
+ 
+   STEP 4 — CHROMADB 
+     app/embeddings/vectordb.py 
+import chromadb 
+ 
+client = chromadb.PersistentClient( 
+    path=" ./chroma_db" 
+) 
+ 
+collection = client.get_or_create_collection( 
+    name="dvp_tables" 
+) 
+ 
+def store_chunks(chunks): 
+ 
+    ids = [] 
+    docs = [] 
+    metas = [] 
+ 
+    for chunk in chunks: 
+ 
+        ids.append(chunk["id"]) 
+ 
+        docs.append(chunk["text"]) 
+ 
+        metas.append(chunk["metadata"]) 
+ 
+    collection.add( 
+        ids=ids, 
+        documents=docs, 
+        metadatas=metas 
+    ) 
+ 
+   STEP 5 — SEMANTIC SEARCH 
+     app/query/semantic_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+def semantic_search(query, top_k=5): 
+ 
+    results = collection.query( 
+        query_texts=[query], 
+        n_results=top_k 
+    ) 
+ 
+    return results 
+ 
+   STEP 6 — UPDATE PIPELINE 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+from app.parser.quality_scorer import ( 
+    filter_useful_tables 
+) 
+ 
+from app.embeddings.chunker import ( 
+    dataframe_to_chunks 
+) 
+ 
+from app.embeddings.vectordb import ( 
+    store_chunks 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    raw_tables = extract_tables_pdf( 
+        file_path 
+    ) 
+ 
+    normalized_tables = normalize_tables( 
+        raw_tables 
+    ) 
+ 
+    useful_tables = filter_useful_tables( 
+        normalized_tables 
+    ) 
+ 
+    all_chunks = [] 
+ 
+    for table in useful_tables: 
+ 
+        chunks = dataframe_to_chunks( 
+            table 
+        ) 
+ 
+        all_chunks.extend(chunks) 
+ 
+    store_chunks(all_chunks) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": useful_tables, 
+        "chunks": all_chunks 
+    } 
+ 
+   STEP 7 — TEST INGESTION 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+print("\n   TOTAL CHUNKS:") 
+print(len(result["chunks"])) 
+ 
+   STEP 8 — TEST SEARCH 
+     tests/test_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+results = semantic_search( 
+    "maximum front pad temperature" 
+) 
+ 
+print(results) 
+ 
+   EXPECTED RESULT 
+Front pad peak temperature | Maximum | 163 | 179 | 188 
+retrieved semantically    
+ 
+   WHAT DAY 7 ACHIEVES 
+   engineering semantic search 
+   vector database 
+   embeddings 
+   retrieval layer 
+   RAG foundation 
+   scalable architecture 
+ 
+   YOUR SYSTEM NOW 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Chunking 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Semantic Search    
+`` 
+ 
+   YOU ARE NOW HERE 
+   DAY 7 COMPLETE 
+Next: 
+DAY 8 
+→ Hybrid Search 
+→ BM25 + Vector 
+→ Metadata Filtering 
+→ Better engineering retrieval 
+ 
+        DAY 10 — DUCKDB + STRUCTURED ANALYTICS + ENGINEERING QUERY ENGINE 
+   GOAL 
+Move from: 
+RAG search    
+to: 
+structured engineering analytics    
+ 
+   WHY DAY 10 IS IMPORTANT 
+Current system: 
+LLM retrieval works    
+BUT: 
+LLM is weak for exact calculations   
+aggregations   
+comparisons   
+engineering analytics   
+Example: 
+Which condition has highest brake temperature? 
+Average CDT across reports? 
+Compare GHD vs HSD? 
+LLM alone is unreliable. 
+ 
+   DAY 10 FIXES 
+   DuckDB structured storage 
+   SQL querying 
+   engineering analytics 
+   exact numeric calculations 
+   metadata-aware filtering 
+   hybrid RAG + SQL 
+ 
+   DAY 10 ARCHITECTURE 
+PDF 
+↓ 
+Extraction 
+↓ 
+Tables 
+↓ 
+Chunks 
+↓ 
+ChromaDB    semantic 
+ 
+AND 
+ 
+↓ 
+Structured Records 
+↓ 
+DuckDB    analytics 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── storage/ 
+│   ├── duckdb_store.py    
+│ 
+├── analytics/ 
+│   ├── analytics_engine.py    
+│ 
+├── query/ 
+│   ├── sql_query.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+ 
+   STEP 1 — INSTALL 
+pip install duckdb 
+ 
+   STEP 2 — DUCKDB STORAGE 
+     app/storage/duckdb_store.py 
+import duckdb 
+ 
+conn = duckdb.connect( 
+    "engineering.db" 
+) 
+ 
+def initialize_db(): 
+ 
+    conn.execute(""" 
+    CREATE TABLE IF NOT EXISTS engineering_chunks ( 
+ 
+        chunk_id TEXT, 
+        page INTEGER, 
+        table_id TEXT, 
+        content TEXT 
+    ) 
+    """) 
+ 
+def insert_chunks(chunks): 
+ 
+    for chunk in chunks: 
+ 
+        conn.execute(""" 
+        INSERT INTO engineering_chunks 
+        VALUES (?, ?, ?, ?) 
+        """ , ( 
+ 
+            chunk["id"], 
+ 
+            chunk["metadata"]["page"], 
+ 
+            chunk["metadata"]["table_id"], 
+ 
+            chunk["text"] 
+        )) 
+ 
+   STEP 3 — STORE INTO DUCKDB 
+     app/ingestion/pipeline.py 
+Add: 
+from app.storage.duckdb_store import ( 
+    initialize_db, 
+    insert_chunks 
+) 
+ 
+Add before return: 
+initialize_db() 
+ 
+insert_chunks(all_chunks) 
+ 
+   STEP 4 — SQL QUERY ENGINE 
+     app/query/sql_query.py 
+from app.storage.duckdb_store import ( 
+    conn 
+) 
+ 
+def run_sql(query): 
+ 
+    result = conn.execute(query) 
+ 
+    return result.fetchall() 
+ 
+   STEP 5 — ANALYTICS ENGINE 
+     app/analytics/analytics_engine.py 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+def get_temperature_rows(): 
+ 
+    query = """ 
+    SELECT * 
+    FROM engineering_chunks 
+    WHERE LOWER(content) 
+    LIKE '%temperature%' 
+    """ 
+ 
+    return run_sql(query) 
+ 
+   STEP 6 — TEST SQL 
+     tests/test_sql.py 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+result = run_sql(""" 
+ 
+SELECT * 
+FROM engineering_chunks 
+LIMIT 10 
+ 
+""") 
+ 
+print(result) 
+ 
+   STEP 7 — TEST ANALYTICS 
+     tests/test_analytics.py 
+from app.analytics.analytics_engine import ( 
+    get_temperature_rows 
+) 
+ 
+results = get_temperature_rows() 
+ 
+for r in results: 
+ 
+    print(r) 
+ 
+   WHAT DAY 10 ACHIEVES 
+   exact SQL filtering 
+   engineering analytics 
+   numeric querying 
+   scalable storage 
+   metadata filtering 
+   hybrid SQL + RAG 
+ 
+   HUGE ARCHITECTURE SHIFT 
+Before: 
+LLM-only retrieval 
+Now: 
+Semantic AI    
++ 
+Structured Analytics    
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings → ChromaDB    
+ 
+AND 
+ 
+↓ 
+Structured Storage → DuckDB    
+ 
+   EXAMPLE FUTURE QUERIES 
+SELECT * 
+FROM engineering_chunks 
+WHERE content LIKE '%Maximum%' 
+ 
+SELECT COUNT(*) 
+FROM engineering_chunks 
+ 
+SELECT * 
+FROM engineering_chunks 
+WHERE page = 6 
+ 
+   WHY THIS IS POWERFUL 
+Now your system supports: 
+   semantic retrieval 
+   exact retrieval 
+   analytics 
+   engineering computations 
+   reporting 
+   dashboarding 
+ 
+   YOU ARE NOW HERE 
+   DAY 10 COMPLETE 
+Next: 
+DAY 11 
+→ LangGraph agent 
+→ tool calling 
+→ SQL + RAG orchestration 
+→ engineering copilot workflows 
+ 
+        DAY 11 — LANGGRAPH AGENT + TOOL CALLING + SQL/RAG ORCHESTRATION 
+   GOAL 
+Move from: 
+manual retrieval    
+to: 
+AI engineering copilot    
+`` 
+that can: 
+   decide when to use RAG 
+   decide when to use SQL 
+   combine both 
+   answer engineering questions intelligently 
+ 
+   DAY 11 ARCHITECTURE 
+User Question 
+     ↓ 
+LangGraph Agent    
+     ↓ 
+Tool Selection 
+ 
+┌───────────────┬───────────────┐ 
+│               │               │ 
+RAG Search    SQL Search     Hybrid 
+│               │               │ 
+└───────────────┴───────────────┘ 
+         ↓ 
+Context Assembly 
+         ↓ 
+Qwen2.5 
+         ↓ 
+Final Engineering Answer 
+ 
+   WHAT DAY 11 ADDS 
+   LangGraph agent 
+   tool calling 
+   query routing 
+   SQL orchestration 
+   RAG orchestration 
+   engineering copilot workflow 
+   intelligent retrieval selection 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── agent/ 
+│   ├── tools.py    
+│   ├── router.py    
+│   ├── graph.py    
+│   ├── ask.py    
+`` 
+ 
+   STEP 1 — INSTALL 
+pip install langgraph langchain 
+ 
+   STEP 2 — CREATE TOOLS 
+     app/agent/tools.py 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+from app.query.structured_search import ( 
+    structured_search 
+) 
+ 
+def rag_tool(query): 
+ 
+    results = hybrid_search(query) 
+ 
+    return { 
+        "tool": "rag" , 
+        "results": results 
+    } 
+ 
+def sql_tool(query): 
+ 
+    results = structured_search( 
+        keyword=query 
+    ) 
+ 
+    return { 
+        "tool": "sql" , 
+        "results": results 
+    } 
+ 
+   STEP 3 — QUERY ROUTER 
+     app/agent/router.py 
+def route_query(query): 
+ 
+    query = query.lower() 
+ 
+    sql_keywords = [ 
+ 
+        "count" , 
+        "maximum" , 
+        "minimum" , 
+        "average" , 
+        "compare" , 
+        "page" 
+ 
+    ] 
+ 
+    for k in sql_keywords: 
+ 
+        if k in query: 
+            return "sql" 
+ 
+    return "rag" 
+ 
+   STEP 4 — LANGGRAPH WORKFLOW 
+     app/agent/graph.py 
+from app.agent.router import ( 
+    route_query 
+) 
+ 
+from app.agent.tools import ( 
+    rag_tool, 
+    sql_tool 
+) 
+ 
+def run_agent(query): 
+ 
+    route = route_query(query) 
+ 
+    if route == "sql": 
+ 
+        return sql_tool(query) 
+ 
+    return rag_tool(query) 
+ 
+   STEP 5 — FINAL AGENT 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+def ask_question(query): 
+ 
+    tool_output = run_agent(query) 
+ 
+    context = "" 
+ 
+    #    RAG context 
+    if tool_output["tool"] == "rag": 
+ 
+        for r in tool_output["results"]: 
+ 
+            context += ( 
+                r["document"] + "\n" 
+            ) 
+ 
+    #    SQL context 
+    else: 
+ 
+        for r in tool_output["results"]: 
+ 
+            context += ( 
+                str(r) + "\n" 
+            ) 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering assistant. 
+ 
+Use ONLY the provided context. 
+ 
+Context: 
+{context} 
+ 
+Question: 
+{query} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 6 — TEST AGENT 
+     main.py 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+while True: 
+ 
+    query = input("\nAsk: ") 
+ 
+    if query.lower() == "exit": 
+        break 
+ 
+    response = ask_question(query) 
+ 
+    print("\n=== RESPONSE ===\n") 
+ 
+    print(response) 
+ 
+ 
+   EXAMPLE FLOW 
+ 
+Query 1 
+What is front pad maximum temperature? 
+Agent decides: 
+   RAG search 
+because semantic retrieval better. 
+ 
+Query 2 
+Count all temperature rows 
+Agent decides: 
+   SQL search 
+because structured analytics better. 
+ 
+   WHY DAY 11 IS BIG 
+Before: 
+manual pipelines 
+Now: 
+AI decides retrieval strategy    
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+ChromaDB    
+↓ 
+DuckDB    
+↓ 
+LangGraph Agent    
+↓ 
+Qwen2.5    
+ 
+   YOU NOW HAVE 
+   local engineering copilot 
+   hybrid retrieval agent 
+   semantic + SQL orchestration 
+   tool-calling workflow 
+   enterprise-style RAG architecture 
+ 
+   YOU ARE NOW HERE 
+   DAY 11 COMPLETE 
+Next: 
+DAY 12 
+→ conversational memory 
+→ multi-step reasoning 
+→ engineering workflows 
+→ report summarization 
+→ recommendation engine 
+ 
+        DAY 12 — CONVERSATION MEMORY + QUERY REWRITER + MULTI-TURN ENGINEERING COPILOT 
+   GOAL 
+Move from: 
+single-turn QA    
+to: 
+multi-turn engineering copilot    
+that supports: 
+   follow-up questions 
+   conversational memory 
+   contextual retrieval 
+   engineering discussion continuity 
+   report summarization 
+   conversational RAG 
+ 
+   WHY DAY 12 IS IMPORTANT 
+Current system: 
+Q1 → retrieve → answer 
+BUT follow-up questions fail: 
+Q1: What is front pad maximum temperature? 
+Q2: Compare with rear liner temperature. 
+because retrieval only sees: 
+Compare with rear liner temperature 
+without previous context. 
+ 
+   DAY 12 FIXES 
+   session memory 
+   query rewriting 
+   context-aware retrieval 
+   multi-turn reasoning 
+   engineering workflow continuity 
+ 
+   DAY 12 ARCHITECTURE 
+User Question 
+      ↓ 
+Conversation Memory    
+      ↓ 
+Query Rewriter    
+      ↓ 
+Router    
+      ↓ 
+RAG / SQL Retrieval    
+      ↓ 
+Context Builder    
+      ↓ 
+Qwen2.5    
+      ↓ 
+Store Conversation    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── memory/ 
+│   ├── session_memory.py    
+│   ├── query_rewriter.py    
+│ 
+├── agent/ 
+│   ├── ask.py    MODIFY 
+│ 
+├── summarizer/ 
+│   ├── report_summary.py    
+│ 
+├── tests/ 
+│   ├── test_summary.py    
+ 
+   STEP 1 — SESSION MEMORY 
+     app/memory/session_memory.py 
+conversation_history = [] 
+ 
+def add_message(role, content): 
+ 
+    conversation_history.append({ 
+        "role": role, 
+        "content": content 
+    }) 
+ 
+def get_history(): 
+ 
+    return conversation_history 
+ 
+def clear_history(): 
+ 
+    conversation_history.clear() 
+ 
+   STEP 2 — QUERY REWRITER 
+     app/memory/query_rewriter.py 
+from app.memory.session_memory import ( 
+    get_history 
+) 
+ 
+def rewrite_query(current_query): 
+ 
+    history = get_history() 
+ 
+    #    previous user queries 
+    previous_queries = [ 
+ 
+        h["content"] 
+ 
+        for h in history 
+ 
+        if h["role"] == "user" 
+    ] 
+ 
+    #    no history 
+    if not previous_queries: 
+ 
+        return current_query 
+ 
+    previous_query = previous_queries[-1] 
+ 
+    #    avoid duplicate expansion 
+    if current_query.lower() in previous_query.lower(): 
+ 
+        return current_query 
+ 
+    #    contextual rewrite 
+    rewritten = ( 
+        previous_query 
+        + " " 
+        + current_query 
+    ) 
+ 
+    return rewritten 
+ 
+   STEP 3 — MODIFY ask.py 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+from app.memory.session_memory import ( 
+    add_message 
+) 
+ 
+from app.memory.query_rewriter import ( 
+    rewrite_query 
+) 
+ 
+def ask_question(query): 
+ 
+    #    store user query 
+    add_message( 
+        "user" , 
+        query 
+    ) 
+ 
+    #    rewrite using conversation 
+    enhanced_query = rewrite_query( 
+        query 
+    ) 
+ 
+    #    retrieval 
+    tool_output = run_agent( 
+        enhanced_query 
+    ) 
+ 
+    context = "" 
+ 
+    for r in tool_output["results"]: 
+ 
+        if isinstance(r, dict): 
+ 
+            context += ( 
+                str( 
+                    r.get("document" , "") 
+                ) 
+                + "\n" 
+            ) 
+ 
+        else: 
+ 
+            context += ( 
+                str(r) 
+                + "\n" 
+            ) 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering assistant. 
+ 
+Answer ONLY from the provided context. 
+ 
+If answer is unavailable say: 
+"Answer not found in context. " 
+ 
+==================== 
+CONTEXT 
+==================== 
+ 
+{context} 
+ 
+==================== 
+QUESTION 
+==================== 
+ 
+{query} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    answer = response["message"]["content"] 
+ 
+    #    store assistant response 
+    add_message( 
+        "assistant" , 
+        answer 
+    ) 
+ 
+    return answer 
+ 
+   STEP 4 — REPORT SUMMARIZER 
+     app/summarizer/report_summary.py 
+import ollama 
+ 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+def summarize_report(): 
+ 
+    rows = run_sql(""" 
+ 
+    SELECT content 
+    FROM engineering_chunks 
+    LIMIT 100 
+ 
+    """) 
+ 
+    combined = "\n" .join( 
+        r[0] 
+        for r in rows 
+    ) 
+ 
+    prompt = f""" 
+ 
+Summarize this automotive engineering report. 
+ 
+Focus on: 
+- brake system 
+- temperatures 
+- key observations 
+- important values 
+- testing conditions 
+ 
+Report Content: 
+{combined} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 5 — UPDATE main.py 
+     main.py 
+import os 
+ 
+from app.ingestion.pipeline import ( 
+    process_pdf 
+) 
+ 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+from app.memory.session_memory import ( 
+    clear_history 
+) 
+ 
+from app.summarizer.report_summary import ( 
+    summarize_report 
+) 
+ 
+PDF_PATH = r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE 
+THERMAL MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+ 
+#    ingest once 
+if not os.path.exists("chroma_db"): 
+ 
+    print("\n   First-time ingestion started...\n") 
+ 
+    process_pdf(PDF_PATH) 
+ 
+    print("\n   Ingestion completed.\n") 
+ 
+else: 
+ 
+    print("\n   Existing DB found. Skipping ingestion.\n") 
+ 
+#    chat loop 
+while True: 
+ 
+    query = input("\nAsk: ") 
+ 
+    if query.lower() == "exit": 
+        break 
+ 
+    #    clear memory 
+    if query.lower() == "clear": 
+ 
+        clear_history() 
+ 
+        print("\n   Memory cleared.\n") 
+ 
+        continue 
+ 
+    #    summarize report 
+    if query.lower() == "summary": 
+ 
+        summary = summarize_report() 
+ 
+        print("\n=== SUMMARY ===\n") 
+ 
+        print(summary) 
+ 
+        continue 
+ 
+    response = ask_question(query) 
+ 
+    print("\n=== RESPONSE ===\n") 
+ 
+    print(response) 
+ 
+   EXAMPLE MULTI-TURN FLOW 
+ 
+USER 
+What is front pad maximum temperature? 
+ 
+ASSISTANT 
+163, 179, 188 deg C 
+ 
+USER 
+Compare with rear liner temperature 
+ 
+INTERNAL QUERY REWRITE 
+What is front pad maximum temperature? 
+Compare with rear liner temperature 
+ 
+ASSISTANT 
+Front pad maximum temperatures: 
+163, 179, 188 deg C 
+ 
+Rear liner maximum temperatures: 
+153, 153, 146 deg C 
+ 
+   WHAT DAY 12 ACHIEVES 
+   conversational memory 
+   follow-up reasoning 
+   contextual retrieval 
+   engineering dialogue 
+   report summarization 
+   multi-turn RAG 
+   query rewriting 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+DuckDB 
+↓ 
+Hybrid Retrieval 
+↓ 
+Agent Routing 
+↓ 
+Conversation Memory    
+↓ 
+Query Rewriter    
+↓ 
+Qwen2.5    
+ 
+   YOU ARE NOW HERE 
+   DAY 12 COMPLETE 
+Next: 
+DAY 13 
+→ engineering workflow agents 
+→ anomaly detection 
+→ recommendation engine 
+→ comparative analysis 
+→ autonomous report insights 
+ 
+        DAY 13 — GENERIC REASONING + TOOL ORCHESTRATION + CONTEXT INTELLIGENCE 
+   GOAL 
+Move from: 
+retrieval + memory    
+to: 
+generic engineering intelligence system    
+WITHOUT: 
+• hardcoded thresholds   
+• metric-specific logic   
+• temperature rules   
+• domain assumptions   
+ 
+   CORE IDEA OF NEW DAY 13 
+Python should NOT do engineering reasoning. 
+Instead: 
+Python → orchestration    
+LLM → reasoning    
+ 
+   WHAT DAY 13 ADDS 
+   structured context intelligence 
+   dynamic reasoning prompts 
+   tool orchestration 
+   generic engineering analysis 
+   context compression 
+   deduplication 
+   insight generation 
+   recommendation generation 
+WITHOUT hardcoding. 
+ 
+   DAY 13 ARCHITECTURE 
+User Query 
+      ↓ 
+Conversation Memory    
+      ↓ 
+QueryRetriever   Query Rewriter    
+      ↓ 
+Context Deduplicator    
+      ↓ 
+Structured Context Builder    
+      ↓ 
+Reasoning Prompt Generator    
+      ↓ 
+Qwen2.5    
+      ↓ 
+ 
+   IMPORTANT SHIFT 
+OLD DAY 13: 
+Python decides anomaly   
+NEW DAY 13: 
+LLM infers anomaly    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── context/ 
+│   ├── context_builder.py    
+│   ├── context_deduplicator.py    
+│   ├── reasoning_prompt.py    
+│ 
+├── agent/ 
+│   ├── ask.py    MODIFY 
+ 
+   STEP 1 — CONTEXT DEDUPLICATOR 
+     app/context/context_deduplicator.py 
+def deduplicate_context(results): 
+ 
+    unique = [] 
+ 
+    seen = set() 
+ 
+    for r in results: 
+ 
+        if isinstance(r, dict): 
+ 
+            text = str( 
+                r.get("document" , "") 
+            ).strip() 
+ 
+        else: 
+ 
+            text = str(r).strip() 
+ 
+        #    skip duplicates 
+        if text in seen: 
+            continue 
+ 
+        seen.add(text) 
+ 
+        unique.append(text) 
+ 
+    return unique 
+ 
+   STEP 2 — STRUCTURED CONTEXT BUILDER 
+     app/context/context_builder.py 
+def build_structured_context(chunks): 
+ 
+    sections = [] 
+ 
+    for idx, chunk in enumerate(chunks): 
+ 
+        block = f""" 
+ 
+[Context {idx+1}] 
+ 
+{chunk} 
+ 
+""" 
+ 
+        sections.append(block) 
+ 
+    return "\n" .join(sections) 
+ 
+   STEP 3 — REASONING PROMPT GENERATOR 
+     app/context/reasoning_prompt.py 
+def build_reasoning_prompt( 
+ 
+    query, 
+    context 
+ 
+): 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering copilot. 
+ 
+Use ONLY the provided context. 
+ 
+Perform: 
+- engineering reasoning 
+- comparisons 
+- observations 
+- trend analysis 
+- recommendations 
+ 
+DO NOT use external knowledge. 
+ 
+If information is unavailable, 
+say: 
+"Answer not found in context. " 
+ 
+==================== 
+ENGINEERING CONTEXT 
+==================== 
+ 
+{context} 
+ 
+==================== 
+QUESTION 
+==================== 
+ 
+{query} 
+ 
+==================== 
+RESPONSE FORMAT 
+==================== 
+ 
+1. Direct Answer 
+2. Engineering Observations 
+3. Comparative Insights 
+4. Recommendations 
+ 
+""" 
+ 
+    return prompt 
+`` 
+ 
+   STEP 4 — MODIFY ask.py 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+from app.memory.session_memory import ( 
+    add_message 
+) 
+ 
+from app.memory.query_rewriter import ( 
+    rewrite_query 
+) 
+ 
+from app.context.context_deduplicator import ( 
+    deduplicate_context 
+) 
+ 
+from app.context.context_builder import ( 
+    build_structured_context 
+) 
+ 
+from app.context.reasoning_prompt import ( 
+    build_reasoning_prompt 
+) 
+ 
+def ask_question(query): 
+ 
+    #    store query 
+    add_message( 
+        "user" , 
+        query 
+    ) 
+ 
+    #    rewrite using memory 
+    enhanced_query = rewrite_query( 
+        query 
+    ) 
+ 
+    #    retrieval 
+    tool_output = run_agent( 
+        enhanced_query 
+    ) 
+ 
+    #    deduplicate 
+    cleaned_chunks = deduplicate_context( 
+        tool_output["results"] 
+    ) 
+ 
+    #    structured context 
+    context = build_structured_context( 
+        cleaned_chunks 
+    ) 
+ 
+    #    reasoning prompt 
+    prompt = build_reasoning_prompt( 
+        query, 
+        context 
+    ) 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    answer = response["message"]["content"] 
+ 
+    #    save response 
+    add_message( 
+        "assistant" , 
+        answer 
+    ) 
+ 
+    return answer 
+ 
+   WHAT THIS NEW DAY 13 DOES 
+Instead of: 
+if value > threshold 
+you now do: 
+LLM-based reasoning    
+using: 
+• retrieved context 
+• comparisons 
+• observations 
+• engineering interpretation 
+ 
+   EXAMPLE 
+USER 
+Compare front pad and rear liner temperature 
+ 
+CONTEXT SENT TO QWEN 
+Front pad: 
+163 | 179 | 188 
+ 
+Rear liner: 
+153 | 153 | 146 
+ 
+QWEN REASONS 
+Front pad temperatures are consistently higher. 
+ 
+Possible braking system.Possible higher thermal loading observed 
+ 
+Review brake balance and cooling performance. 
+   NO hardcoded rules 
+   Generic reasoning 
+   Works for any engineering metric 
+ 
+   WHY THIS IS BETTER 
+This architecture is now: 
+   generic 
+   scalable 
+   multi-domain 
+   future-proof 
+   LLM-native 
+   retrieval-grounded 
+`` 
+instead of: 
+temperature-specific Python rules   
+ 
+   IMPORTANT DESIGN PRINCIPLE 
+   Python Responsibilities 
+   retrieval 
+   orchestration 
+   memory 
+   chunking 
+   storage 
+   context building 
+   tool execution 
+ 
+   LLM Responsibilities 
+   engineering reasoning 
+   comparisons 
+   observations 
+   recommendations 
+   interpretation 
+   analysis 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+DuckDB 
+↓ 
+Hybrid Retrieval 
+↓ 
+Conversation Memory 
+↓ 
+Query Rewriter 
+↓ 
+Context Intelligence    
+↓ 
+LLM Reasoning    
+↓ 
+Engineering Copilot    
+ 
+   YOU ARE NOW HERE 
+   DAY 13 COMPLETE 
+Next: 
+DAY 14 
+→ autonomous engineering workflows 
+→ multi-document reasoning 
+→ report comparison 
+→ dynamic tool planning 
+→ engineering dashboard 
+ 
+        DAY 8 — HYBRID RETRIEVAL + METADATA SEARCH 
+   GOAL 
+Move from: 
+semantic vector search only    
+to: 
+hybrid engineering retrieval    
+ 
+   DAY 8 ARCHITECTURE 
+User Query 
+   ↓ 
+Vector Search (BM25-like)Vector Search (semantic) 
+   + 
+Metadata Filtering 
+   ↓ 
+Combined Ranked Results 
+ 
+   + 
+ 
+   WHAT DAY 8 ADDS 
+   metadata-aware retrieval 
+   keyword search 
+   hybrid retrieval 
+   better engineering queries 
+   page filtering 
+   table filtering 
+   exact metric retrieval 
+   semantic + exact matching 
+ 
+   WHY DAY 8 IS IMPORTANT 
+Current Day 7: 
+semantic similarity only 
+Problem: 
+"Front pad max temp" 
+may retrieve: 
+rear liner temp   
+because embeddings are semantically close. 
+ 
+   Day 8 Fixes This 
+Combines: 
+semantic meaning    
++ 
+exact engineering terms    
+`` 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── query/ 
+│   ├── semantic_search.py 
+│   ├── keyword_search.py    NEW 
+│   ├── hybrid_search.py    NEW 
+│ 
+├── embeddings/ 
+│   ├── metadata_builder.py    NEW 
+ 
+   STEP 1 — ADD METADATA TO CHUNKS 
+     app/embeddings/chunker.py 
+Update: 
+chunks.append({ 
+    "id": f"{table_id}row{idx}" , 
+    "text": text, 
+    "metadata": { 
+        "page": page, 
+        "table_id": table_id 
+    } 
+}) 
+ 
+   TO 
+chunks.append({ 
+    "id": f"{table_id}row{idx}" , 
+    "text": text, 
+ 
+    "metadata": { 
+        "page": page, 
+        "table_id": table_id, 
+ 
+        #    searchable metadata 
+        "row_index": idx, 
+        "source": "table" 
+    } 
+}) 
+ 
+   STEP 2 — KEYWORD SEARCH 
+     app/query/keyword_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+def keyword_search(keyword): 
+ 
+    data = collection.get() 
+ 
+    results = [] 
+ 
+    docs = data["documents"] 
+    metas = data["metadatas"] 
+ 
+    for doc, meta in zip(docs, metas): 
+ 
+        if keyword.lower() in doc.lower(): 
+ 
+            results.append({ 
+                "document": doc, 
+                "metadata": meta 
+            }) 
+ 
+    return results 
+ 
+   STEP 3 — HYBRID SEARCH 
+     app/query/hybrid_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+from app.query.keyword_search import ( 
+    keyword_search 
+) 
+ 
+def hybrid_search(query): 
+ 
+    semantic = semantic_search( 
+        query, 
+        top_k=5 
+    ) 
+ 
+    keyword = keyword_search( 
+        query 
+    ) 
+ 
+    return { 
+        "semantic_results": semantic, 
+        "keyword_results": keyword 
+    } 
+ 
+   STEP 4 — TEST HYBRID SEARCH 
+     tests/test_hybrid_search.py 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+results = hybrid_search( 
+    "front pad maximum temperature" 
+) 
+ 
+print("\n=== SEMANTIC ===\n") 
+print(results["semantic_results"]) 
+ 
+print("\n=== KEYWORD ===\n") 
+print(results["keyword_results"]) 
+`` 
+ 
+FINAL semantic_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+from app.embeddings.embedder import ( 
+    create_embedding 
+) 
+ 
+def semantic_search(query, top_k=5): 
+ 
+    query_embedding = create_embedding( 
+        query 
+    ) 
+ 
+    results = collection.query( 
+        query_embeddings=[query_embedding], 
+        n_results=top_k 
+    ) 
+ 
+    return results 
+ 
+   EXPECTED RESULT 
+   Semantic 
+front pad peak temperature 
+rear liner temperature 
+ 
+   Keyword 
+Front pad peak temperature | Maximum | 163 | 179 | 188 
+ 
+   WHY HYBRID IS BETTER 
+Semantic search gives: 
+meaning similarity    
+ 
+Keyword search gives: 
+exact engineering terms    
+ 
+   COMBINED = MUCH BETTER RAG 
+Especially for: 
+   engineering metrics 
+   component names 
+   exact measurements 
+   conditions 
+   units 
+`` 
+ 
+   DAY 8 RESULT 
+Your system now supports: 
+   semantic retrieval 
+   exact retrieval 
+   metadata-aware retrieval 
+   engineering search 
+   hybrid retrieval 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Hybrid Retrieval    
+ 
+   YOU ARE NOW HERE 
+   DAY 8 COMPLETE 
+Next: 
+DAY 9 
+→ reranking 
+→ metadata filters 
+→ engineering-aware retrieval ranking 
+→ context assembly 
+ 
+        DAY 9 — RERANKING + CONTEXT ASSEMBLY + ENGINEERING RETRIEVAL 
+   GOAL 
+Move from: 
+retrieved chunks    
+to: 
+BEST engineering context for LLM    
+ 
+   WHY DAY 9 IS IMPORTANT 
+Current Day 8: 
+semantic retrieval    
+keyword retrieval    
+BUT: 
+results still noisy 
+duplicates exist 
+ranking weak 
+Example: 
+Average rows 
+Maximum rows 
+duplicate pages 
+partial matches 
+ 
+   DAY 9 FIXES 
+   reranking 
+   duplicate removal 
+   context assembly 
+   better LLM prompts 
+   cleaner final answers 
+ 
+   DAY 9 ARCHITECTURE 
+User Query 
+   ↓ 
+Semantic Retrieval 
+   + 
+Keyword Retrieval 
+   ↓ 
+Merge Results 
+   ↓ 
+Reranker    
+   ↓ 
+Deduplication    
+   ↓ 
+Context Builder    
+   ↓ 
+LLM Prompt    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── reranker/ 
+│   ├── rerank.py    
+│ 
+├── context/ 
+│   ├── context_builder.py    
+│ 
+├── query/ 
+│   ├── hybrid_search.py    MODIFY 
+│ 
+├── agent/ 
+│   ├── ask.py    NEW 
+ 
+   STEP 1 — INSTALL RERANKER 
+pip install sentence-transformers 
+ 
+   STEP 2 — RERANKER 
+     app/reranker/rerank.py 
+from sentence_transformers import ( 
+    CrossEncoder 
+) 
+ 
+reranker = CrossEncoder( 
+    "BAAI/bge-reranker-base" 
+) 
+ 
+def rerank_results(query, documents): 
+ 
+    pairs = [] 
+ 
+    for doc in documents: 
+        pairs.append([ 
+            query, 
+            doc["document"] 
+        ]) 
+ 
+    scores = reranker.predict(pairs) 
+ 
+    ranked = [] 
+ 
+    for doc, score in zip(documents, scores): 
+ 
+        doc["rerank_score"] = float(score) 
+ 
+        ranked.append(doc) 
+ 
+    ranked = sorted( 
+        ranked, 
+        key=lambda x: x["rerank_score"], 
+        reverse=True 
+    ) 
+ 
+    return ranked 
+ 
+   STEP 3 — IMPROVE HYBRID SEARCH 
+     app/query/hybrid_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+from app.query.keyword_search import ( 
+    keyword_search 
+) 
+ 
+from app.reranker.rerank import ( 
+    rerank_results 
+) 
+ 
+def hybrid_search(query): 
+ 
+    semantic = semantic_search( 
+        query, 
+        top_k=10 
+    ) 
+ 
+    semantic_docs = [] 
+ 
+    docs = semantic["documents"][0] 
+    metas = semantic["metadatas"][0] 
+ 
+    for doc, meta in zip(docs, metas): 
+ 
+        semantic_docs.append({ 
+            "document": doc, 
+            "metadata": meta, 
+            "source": "semantic" 
+        }) 
+ 
+    keyword_docs = keyword_search(query) 
+ 
+    combined = semantic_docs + keyword_docs 
+ 
+    #    deduplicate 
+    unique = {} 
+ 
+    for item in combined: 
+        unique[item["document"]] = item 
+ 
+    final_docs = list(unique.values()) 
+ 
+    #    rerank 
+    reranked = rerank_results( 
+        query, 
+        final_docs 
+    ) 
+ 
+    return reranked[:5] 
+ 
+   STEP 4 — CONTEXT BUILDER 
+     app/context/context_builder.py 
+def build_context(results): 
+ 
+    context = [] 
+ 
+    for idx, r in enumerate(results): 
+ 
+        chunk = f""" 
+[Context {idx+1}] 
+Page: {r['metadata']['page']} 
+ 
+{r['document']} 
+""" 
+ 
+        context.append(chunk) 
+ 
+    return "\n" .join(context) 
+ 
+   STEP 5 — QWEN QUERY AGENT 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+from app.context.context_builder import ( 
+    build_context 
+) 
+ 
+def ask_question(query): 
+ 
+    results = hybrid_search(query) 
+ 
+    context = build_context(results) 
+ 
+    prompt = f""" 
+You are an automotive engineering assistant. 
+ 
+Use ONLY the provided context. 
+ 
+Context: 
+{context} 
+ 
+Question: 
+{query} 
+""" 
+ 
+    response = ollama.chat( 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 6 — TEST AGENT 
+     tests/test_agent.py 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+response = ask_question( 
+    "What is the maximum front pad temperature?" 
+) 
+ 
+print("\n=== RESPONSE ===\n") 
+ 
+print(response) 
+ 
+   EXPECTED RESULT 
+The maximum front pad peak temperature observed: 
+ 
+CDT : 163 deg C 
+GHD : 179 deg C 
+HSD : 188 deg C 
+ 
+   WHAT DAY 9 ACHIEVES 
+   reranking 
+   context assembly 
+   engineering QA 
+   duplicate removal 
+   cleaner retrieval 
+   better answers 
+   local engineering copilot 
+ 
+   YOUR SYSTEM NOW 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Hybrid Search 
+↓ 
+Reranking    
+↓ 
+Context Builder    
+↓ 
+Qwen2.5    
+ 
+   YOU ARE NOW HERE 
+   DAY 9 COMPLETE 
+Next: 
+DAY 10 
+→ metadata-aware analytics 
+→ structured querying 
+→ engineering calculations 
+→ DuckDB integration 
+ 
+Perfect    — let’s rebuild Day 1 using YOUR current template + final architecture direction (pymupdf 
++ pdfplumber ready) 
+     This is clean, production-compatible Day 1 (no rework later) 
+ 
+           DAY 1 — PROJECT FOUNDATION (FINAL VERSION) 
+ 
+          GOAL (Day 1) 
+✔ Setup repo 
+✔ Setup folder structure (correct for future) 
+✔ Setup config (free/paid toggle) 
+✔ Setup API base 
+✔ Prepare for Day 2/3 (parser ready) 
+ 
+      FINAL FOLDER STRUCTURE (CREATE EXACT) 
+project_root/ 
+│ 
+├── app/ 
+│   ├── config.py    
+│ 
+│   ├── api/ 
+│   │   └── main.py    
+│ 
+│   ├── ingestion/ 
+│   │   └── pipeline.py    
+│ 
+│   ├── parser/ 
+│   │   ├── parser_router.py    
+│   │   ├── table_router.py    
+│   │   ├── pymupdf_parser.py   (Day 2) 
+│   │   ├── pdfplumber_table.py   (Day 3) 
+│   │   ├── gcp_parser.py    stub 
+│   │   ├── gcp_table_parser.py    stub 
+│ 
+│   ├── schema/ 
+│   │   ├── models.py    
+│   │   ├── mapper.py    
+│ 
+│   ├── storage/ 
+│   │   └── db.py    
+│ 
+│   ├── query/   (later) 
+│   ├── agent/   (later) 
+│   ├── models/   (later) 
+│ 
+├── tests/ 
+│   └── test_ingestion.py    
+│ 
+├── data/ 
+├── requirements.txt    
+└── .env 
+ 
+      STEP 1 — ENV SETUP 
+python -m venv venv 
+source venv/bin/activate   # or Windows 
+pip install fastapi uvicorn pymupdf pdfplumber duckdb pandas 
+ 
+      STEP 2 — CONFIG (VERY IMPORTANT) 
+     app/config.py 
+MODE = "free"   # change to "paid" later 
+ 
+      STEP 3 — API BASE 
+     app/api/main.py 
+from fastapi import FastAPI 
+ 
+app = FastAPI() 
+ 
+@app.get("/") 
+def health(): 
+    return {"status": "ok"} 
+ 
+   RUN 
+uvicorn app.api.main:app --reload 
+ 
+      STEP 4 — PARSER ROUTER (FUTURE READY) 
+     app/parser/parser_router.py 
+from app.config import MODE 
+ 
+def parse_document(file_path): 
+    if MODE == "paid": 
+        from app.parser.gcp_parser import parse_gcp 
+        return parse_gcp(file_path) 
+ 
+    # Day 2 will plug pymupdf here 
+    return { 
+        "titles": [], 
+        "text": [] 
+    } 
+ 
+      STEP 5 — TABLE ROUTER (FUTURE READY) 
+     app/parser/table_router.py 
+from app.config import MODE 
+ 
+def get_tables(file_path, parsed): 
+    if MODE == "paid": 
+        from app.parser.gcp_table_parser import gcp_table_extract 
+        return gcp_table_extract(file_path) 
+ 
+    # Day 3 will plug pdfplumber here 
+    return [] 
+ 
+      STEP 6 — PIPELINE (CORE FLOW) 
+     app/ingestion/pipeline.py 
+from app.parser.parser_router import parse_document 
+from app.parser.table_router import get_tables 
+ 
+def process_pdf(file_path): 
+    parsed = parse_document(file_path) 
+ 
+    tables = get_tables(file_path, parsed) 
+ 
+    return { 
+        "titles": parsed.get("titles" , []), 
+        "text": parsed.get("text" , []), 
+        "tables": tables 
+    } 
+ 
+      STEP 7 — STORAGE BASE (DuckDB) 
+     app/storage/db.py 
+import duckdb 
+ 
+conn = duckdb.connect("data.db") 
+ 
+conn.execute(""" 
+CREATE TABLE IF NOT EXISTS metrics ( 
+    component TEXT, 
+    value FLOAT, 
+    condition TEXT 
+) 
+""") 
+ 
+      STEP 8 — SCHEMA (INITIAL ONLY) 
+     app/schema/models.py 
+def create_record(component, value, condition): 
+    return { 
+        "component": component, 
+        "value": value, 
+        "condition": condition 
+    } 
+ 
+      STEP 9 — TEST FILE 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+print("\n=== OUTPUT ===\n") 
+print(result) 
+ 
+      STEP 10 — REQUIREMENTS FILE 
+     requirements.txt 
+fastapi 
+uvicorn 
+pymupdf 
+pdfplumber 
+duckdb 
+pandas 
+ 
+      DAY 1 OUTPUT (EXPECTED) 
+Run: 
+python -m tests.test_ingestion 
+     Output: 
+{ 
+  "titles": [], 
+  "text": [], 
+  "tables": [] 
+} 
+   THIS IS CORRECT FOR DAY 1 
+ 
+      WHERE YOU ARE AFTER DAY 1 
+Infra    
+Router    
+Pipeline    
+Storage    
+Parser   (next) 
+Tables   (next) 
+Schema   (next) 
+ 
+      WHAT COMES NEXT 
+        Day 2: 
+pymupdf (text extraction) 
+        Day 3: 
+pdfplumber (table extraction + cleaning) 
+ 
+      FINAL MESSAGE 
+     This Day 1 is: 
+✔ aligned with your architecture    
+✔ ready for real parser    
+✔ supports FREE + PAID    
+✔ no rework later    
+ 
+   Say Day 2         
+ 
+Perfect    — here is DAY 2 (FINAL, CORRECT, aligned with your working pdfplumber flow + template) 
+     Focus = ONLY TEXT EXTRACTION (PyMuPDF) 
+     No tables yet (Day 3) 
+ 
+           DAY 2 — TEXT EXTRACTION (PyMuPDF) 
+ 
+          WHERE WE ARE 
+Day 1    Infra ready 
+Day 2 ← YOU ARE HERE 
+Tables   (next) 
+Schema   
+ 
+          GOAL 
+PDF → clean text + titles    
+ 
+      FILES TO MODIFY 
+app/parser/ 
+  ├── parser_router.py    modify 
+  ├── pymupdf_parser.py    create 
+ 
+      STEP 1 — INSTALL (if not done) 
+pip install pymupdf 
+ 
+      STEP 2 — CREATE TEXT PARSER 
+     app/parser/pymupdf_parser.py 
+import fitz  # PyMuPDF 
+ 
+def parse_pymupdf(file_path): 
+    doc = fitz.open(file_path) 
+ 
+    titles = [] 
+    text = [] 
+ 
+    for page_num, page in enumerate(doc): 
+        content = page.get_text() 
+ 
+        if not content: 
+            continue 
+ 
+        lines = content.split("\n") 
+ 
+        for line in lines: 
+            line = line.strip() 
+ 
+            if not line: 
+                continue 
+ 
+            #    Title detection (important) 
+            if ( 
+                line.isupper() or 
+                "TEST REPORT" in line or 
+                "BRAKE" in line 
+            ): 
+                titles.append(line) 
+            else: 
+                text.append(line) 
+ 
+    return { 
+        "titles": titles, 
+        "text": text 
+    } 
+ 
+      STEP 3 — UPDATE ROUTER 
+     app/parser/parser_router.py 
+from app.config import MODE 
+from app.parser.pymupdf_parser import parse_pymupdf 
+from app.parser.gcp_parser import parse_gcp 
+ 
+def parse_document(file_path): 
+    if MODE == "paid": 
+        return parse_gcp(file_path) 
+ 
+    #    FREE MODE 
+    return parse_pymupdf(file_path) 
+ 
+      STEP 4 — PIPELINE (NO CHANGE) 
+     already correct: 
+parsed = parse_document(file_path) 
+ 
+      STEP 5 — TEST 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+print("\n=== TITLES ===\n" , result["titles"][:10]) 
+print("\n=== TEXT ===\n" , result["text"][:20]) 
+ 
+      EXPECTED OUTPUT 
+ 
+   TITLES 
+TPDS TEST REPORT    
+BRAKE THERMAL MAPPING    
+VEHICLE CONFIGURATION    
+ 
+   TEXT 
+Objective: To evaluate brake thermal mapping    
+Booster Size 9"    
+Front Brake Pad Grade Apache    
+ 
+      VERIFY (VERY IMPORTANT) 
+   You should see: 
+   100+ text lines (not empty) 
+   meaningful engineering text 
+   titles separated 
+ 
+  If you see: 
+[] empty   
+     then PyMuPDF not working 
+ 
+      FINAL STATE AFTER DAY 2 
+Text    
+Titles    
+Parser    (stable) 
+Tables   (next day) 
+ 
+      WHY THIS STEP MATTERS 
+     This text will later give: 
+✔ metadata (component, dvp) 
+✔ fallback when tables fail 
+✔ context for LLM 
+ 
+      NEXT 
+     DAY 3 (IMPORTANT) 
+pdfplumber tables + None cleaning (your breakthrough) 
+ 
+   Say: 
+Day 3 
+We’ll plug your working table extraction properly into system         
+ 
+   DAY 3 (MODIFIED FINAL VERSION) 
+     Goal: 
+PDF → Page-wise structured content 
+(Text + Tables + Page info) 
+ 
+   FILES 
+app/parser/ 
+  ├── pymupdf_parser.py 
+  ├── pdfplumber_table.py 
+  ├── page_builder.py      NEW 
+ 
+app/ingestion/ 
+  ├── pipeline.py 
+ 
+   app/parser/pymupdf_parser.py 
+import fitz 
+ 
+def parse_pymupdf(file_path): 
+    doc = fitz.open(file_path) 
+ 
+    pages = [] 
+ 
+    for i in range(doc.page_count): 
+        page = doc.load_page(i) 
+ 
+        text_lines = str( 
+            page.get_text("text") or "" 
+        ).splitlines() 
+ 
+        cleaned = [] 
+ 
+        for line in text_lines: 
+            line = line.strip() 
+ 
+            if line: 
+                cleaned.append(line) 
+ 
+        pages.append({ 
+            "page": i, 
+            "text": cleaned 
+        }) 
+ 
+    return pages 
+ 
+   app/parser/pdfplumber_table.py 
+import pdfplumber 
+ 
+def clean_row(row): 
+    return [ 
+        cell.strip() 
+        for cell in row 
+        if cell not in (None, "" , " ") 
+    ] 
+ 
+def extract_tables_pdf(file_path): 
+    tables = [] 
+ 
+    with pdfplumber.open(file_path) as pdf: 
+ 
+        for page_num, page in enumerate(pdf.pages): 
+ 
+            raw_tables = page.extract_tables() 
+ 
+            if not raw_tables: 
+                continue 
+ 
+            for table_id, table in enumerate(raw_tables): 
+ 
+                cleaned_table = [] 
+ 
+                for row in table: 
+                    cleaned = clean_row(row) 
+ 
+                    if len(cleaned) >= 2: 
+                        cleaned_table.append(cleaned) 
+ 
+                if len(cleaned_table) < 2: 
+                    continue 
+ 
+                tables.append({ 
+                    "page": page_num, 
+                    "table_id": f"page_{page_num}table{table_id}" , 
+                    "data": cleaned_table 
+                }) 
+ 
+                print(f"   Table extracted from page {page_num}") 
+ 
+    return tables 
+ 
+   app/parser/page_builder.py 
+from app.parser.pymupdf_parser import parse_pymupdf 
+from app.parser.pdfplumber_table import extract_tables_pdf 
+ 
+def build_page_view(file_path): 
+ 
+    parsed_pages = parse_pymupdf(file_path) 
+ 
+    extracted_tables = extract_tables_pdf(file_path) 
+ 
+    table_map = {} 
+ 
+    for t in extracted_tables: 
+        page = t["page"] 
+ 
+        if page not in table_map: 
+            table_map[page] = [] 
+ 
+        table_map[page].append(t) 
+ 
+    final_pages = [] 
+ 
+    for p in parsed_pages: 
+ 
+        page_num = p["page"] 
+ 
+        final_pages.append({ 
+            "page": page_num, 
+            "text": p["text"], 
+            "tables": table_map.get(page_num, []) 
+        }) 
+ 
+    return final_pages 
+ 
+   app/ingestion/pipeline.py 
+from app.parser.page_builder import build_page_view 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    return { 
+        "pages": pages 
+    } 
+ 
+   tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+for page in result["pages"]: 
+ 
+    print(f"\n========== PAGE {page['page']} ==========\n") 
+ 
+    print("TEXT:\n") 
+ 
+    for line in page["text"][:10]: 
+        print(line) 
+ 
+    print("\nTABLES:\n") 
+ 
+    for table in page["tables"]: 
+ 
+        print("TABLE ID:" , table["table_id"]) 
+ 
+        for row in table["data"][:10]: 
+            print(row) 
+ 
+        print("------") 
+ 
+   OUTPUT YOU SHOULD GET 
+========== PAGE 0 ========== 
+ 
+TEXT: 
+TPDS 
+TEST REPORT 
+Objective: 
+... 
+ 
+TABLES: 
+ 
+TABLE ID: page_0_table_0 
+ 
+['P201 BRAKE TEMPERATURE MAPPING' , 'CDT' , 'GHD' , 'HSD'] 
+['Distance Covered (km)' , '149' , '243' , '264'] 
+['Front pad peak temperature' , '163' , '179' , '188'] 
+ 
+   WHAT DAY 3 ACHIEVES 
+✔ page-wise structure 
+✔ table-wise structure 
+✔ table_id 
+✔ page tracking 
+✔ clean extraction 
+✔ ready for normalization 
+ 
+   NEXT = DAY 4 
+     Day 4 will convert this: 
+['Front pad peak temperature' , '163' , '179' , '188'] 
+into: 
+{ 
+  "metric": "Front pad peak temperature" , 
+  "CDT": 163, 
+  "GHD": 179, 
+  "HSD": 188 
+} 
+and also: 
+table_type 
+source_pdf 
+metadata 
+normalized columns 
+        
+ 
+        DAY 4 — FINAL GENERIC TABLE RECONSTRUCTION (YOUR TEMPLATE) 
+   GOAL 
+PDF 
+↓ 
+Extract ALL tables 
+↓ 
+Preserve ALL rows/columns 
+↓ 
+No hardcoding 
+↓ 
+No table-specific logic 
+↓ 
+Keep merged/split cells as-is 
+ 
+   DAY 4 STATUS 
+At this stage you already have: 
+   PyMuPDF text extraction 
+   pdfplumber table extraction 
+   page-wise extraction 
+   all tables detected 
+   all pages processed 
+Day 4 focuses ONLY on: 
+   generic table preservation 
+   dataframe reconstruction 
+   no data loss 
+`` 
+ 
+   FINAL TEMPLATE STRUCTURE 
+app/ 
+├── parser/ 
+│   ├── pymupdf_parser.py 
+│   ├── pdfplumber_table.py    
+│   ├── page_builder.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    
+│ 
+├── tests/ 
+│   ├── test_ingestion.py    
+ 
+   app/parser/pdfplumber_table.py 
+import pdfplumber 
+import pandas as pd 
+ 
+def extract_tables_pdf(pdf_path): 
+ 
+    tables = [] 
+ 
+    with pdfplumber.open(pdf_path) as pdf: 
+ 
+        for page_num, page in enumerate(pdf.pages): 
+ 
+            raw_tables = page.extract_tables() 
+ 
+            if not raw_tables: 
+                continue 
+ 
+            for table_id, table in enumerate(raw_tables): 
+ 
+                df = pd.DataFrame(table) 
+ 
+                #    remove fully empty rows 
+                df = df.dropna(axis=0, how="all") 
+ 
+                #    remove fully empty columns 
+                df = df.dropna(axis=1, how="all") 
+ 
+                #    preserve merged/split cells 
+                df = df.fillna(None) 
+ 
+                tables.append({ 
+                    "page": page_num, 
+                    "table_id": f"page_{page_num}table{table_id}" , 
+                    "df": df 
+                }) 
+ 
+                print(f"   Table extracted from page {page_num}") 
+ 
+    return tables 
+ 
+   app/parser/pymupdf_parser.py 
+import fitz 
+ 
+def parse_pymupdf(file_path): 
+ 
+    doc = fitz.open(file_path) 
+ 
+    pages = [] 
+ 
+    for i in range(doc.page_count): 
+ 
+        page = doc.load_page(i) 
+ 
+        text_lines = str( 
+            page.get_text("text") or "" 
+        ).splitlines() 
+ 
+        cleaned = [] 
+ 
+        for line in text_lines: 
+ 
+            line = line.strip() 
+ 
+            if line: 
+                cleaned.append(line) 
+ 
+        pages.append({ 
+            "page": i, 
+            "text": cleaned 
+        }) 
+ 
+    return pages 
+`` 
+ 
+   app/parser/page_builder.py 
+from app.parser.pymupdf_parser import parse_pymupdf 
+ 
+def build_page_view(file_path): 
+ 
+    parsed_pages = parse_pymupdf(file_path) 
+ 
+    final_pages = [] 
+ 
+    for p in parsed_pages: 
+ 
+        final_pages.append({ 
+            "page": p["page"], 
+            "text": p["text"] 
+        }) 
+ 
+    return final_pages 
+ 
+   app/ingestion/pipeline.py 
+from app.parser.page_builder import build_page_view 
+from app.parser.pdfplumber_table import extract_tables_pdf 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    tables = extract_tables_pdf(file_path) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": tables 
+    } 
+ 
+   tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+ 
+   WHAT DAY 4 ACHIEVES 
+   ALL pages extracted 
+   ALL tables preserved 
+   ALL columns preserved 
+   ALL rows preserved 
+   merged cells preserved 
+   split cells preserved 
+   generic extraction 
+   no hardcoding 
+   works for ANY PDF 
+ 
+   IMPORTANT DESIGN DECISION 
+Day 4 does NOT try to: 
+  interpret table meaning 
+  repair merged layouts 
+  infer headers 
+  force schema 
+Because that belongs to: 
+DAY 5 → semantic/schema layer 
+ 
+   CURRENT OUTPUT (CORRECT FOR DAY 4) 
+TABLE: page_0_table_1 
+ 
+P201 BRAKE TEMPERATURE MAPPING | CDT | GHD | HSD | None 
+ 
+Front pad peak temperature | Average | 104 | 104 | 82 
+Maximum                    | 163     | 179 | 188 | None 
+   This is GOOD extraction output. 
+   No data loss. 
+   Structure preserved. 
+   Ready for semantic interpretation later. 
+ 
+   YOU ARE NOW HERE 
+   DAY 4 COMPLETE 
+Next: 
+DAY 5 
+→ semantic schema layer 
+→ metadata 
+→ DuckDB 
+→ analytics-ready structure 
+ 
+        DAY 5 — GENERIC STRUCTURAL SEGMENTATION + SEMANTIC PROPAGATION 
+   GOAL 
+Move from: 
+hardcoded anchors   
+to: 
+layout intelligence    
+ 
+   DAY 5 ARCHITECTURE 
+RAW TABLE 
+   ↓ 
+Row profiling 
+   ↓ 
+Structural segmentation 
+   ↓ 
+Semantic propagation 
+   ↓ 
+Clean logical tables 
+`` 
+ 
+   WHAT DAY 5 SOLVES 
+   merged rows 
+   split cells 
+   logical table separation 
+   sparse engineering layouts 
+   side-by-side sections 
+   generic PDFs 
+   no anchors 
+   no hardcoding 
+`` 
+ 
+   YOUR TEMPLATE 
+app/ 
+├── parser/ 
+│   ├── pdfplumber_table.py 
+│   ├── table_segmenter.py    NEW 
+│   ├── semantic_propagator.py    NEW 
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+│ 
+├── tests/ 
+│   ├── test_ingestion.py 
+ 
+   STEP 1 — TABLE SEGMENTER 
+     app/parser/table_segmenter.py 
+import pandas as pd 
+ 
+def get_row_profile(row): 
+ 
+    values = [ 
+        str(x).strip() 
+        for x in row 
+    ] 
+ 
+    numeric_count = 0 
+    text_count = 0 
+    empty_count = 0 
+ 
+    for v in values: 
+ 
+        if v.lower() in ["" , "nan" , "none"]: 
+            empty_count += 1 
+ 
+        elif any(c.isdigit() for c in v): 
+            numeric_count += 1 
+ 
+        else: 
+            text_count += 1 
+ 
+    populated = len(values) - empty_count 
+ 
+    return { 
+        "numeric": numeric_count, 
+        "text": text_count, 
+        "empty": empty_count, 
+        "populated": populated 
+    } 
+ 
+   STEP 2 — GENERIC SEGMENTATION 
+def segment_dataframe(df): 
+ 
+    segments = [] 
+ 
+    current = [] 
+ 
+    previous_profile = None 
+ 
+    for _, row in df.iterrows(): 
+ 
+        row_values = list(row) 
+ 
+        profile = get_row_profile(row_values) 
+ 
+        #    detect structural discontinuity 
+        split_condition = False 
+ 
+        if previous_profile: 
+ 
+            diff = abs( 
+                profile["populated"] - 
+                previous_profile["populated"] 
+            ) 
+ 
+            #    sudden structure shift 
+            if diff >= 3: 
+                split_condition = True 
+ 
+        if split_condition and current: 
+ 
+            segments.append( 
+                pd.DataFrame(current) 
+            ) 
+ 
+            current = [] 
+ 
+        current.append(row_values) 
+ 
+        previous_profile = profile 
+ 
+    if current: 
+        segments.append( 
+            pd.DataFrame(current) 
+        ) 
+ 
+    return segments 
+ 
+   STEP 3 — SEMANTIC PROPAGATION 
+     app/parser/semantic_propagator.py 
+import pandas as pd 
+ 
+def propagate_semantic_rows(df): 
+ 
+    if len(df.columns) == 0: 
+        return df 
+ 
+    first_col = df.iloc[:, 0] 
+ 
+    propagated = [] 
+ 
+    previous_value = None 
+ 
+    for val in first_col: 
+ 
+        val_str = str(val).strip() 
+ 
+        #    semantic parent row 
+        if ( 
+            val_str.lower() not in 
+            ["" , "nan" , "none"] 
+        ): 
+ 
+            previous_value = val 
+ 
+            propagated.append(val) 
+ 
+        else: 
+ 
+            propagated.append(previous_value) 
+ 
+    df.iloc[:, 0] = propagated 
+ 
+    return df 
+ 
+   STEP 4 — MAIN NORMALIZER 
+     app/parser/table_normalizer.py 
+import pandas as pd 
+ 
+from app.parser.table_segmenter import ( 
+    segment_dataframe 
+) 
+ 
+from app.parser.semantic_propagator import ( 
+    propagate_semantic_rows 
+) 
+ 
+def normalize_tables(tables): 
+ 
+    final_tables = [] 
+ 
+    for t in tables: 
+ 
+        df = t["df"] 
+ 
+        #    clean only fully empty rows/cols 
+        df = df.dropna(axis=0, how="all") 
+        df = df.dropna(axis=1, how="all") 
+ 
+        #    preserve structure 
+        df = df.fillna(None) 
+ 
+        #    segment logically 
+        segments = segment_dataframe(df) 
+ 
+        for idx, seg in enumerate(segments): 
+ 
+            #    semantic propagation 
+            seg = propagate_semantic_rows(seg) 
+ 
+            final_tables.append({ 
+                "table_id": 
+                    f"{t['table_id']}segment{idx}" , 
+ 
+                "page": t["page"], 
+ 
+                "df": seg 
+            }) 
+ 
+    return final_tables 
+ 
+   STEP 5 — PIPELINE 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    tables = extract_tables_pdf(file_path) 
+ 
+    normalized_tables = normalize_tables( 
+        tables 
+    ) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": normalized_tables 
+    } 
+ 
+   STEP 6 — TEST 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+ 
+   WHAT THIS DAY 5 ACHIEVES 
+   generic segmentation 
+   structure-aware splitting 
+   semantic propagation 
+   no anchors 
+   no thermal hardcoding 
+   no table-name assumptions 
+   merged-row recovery 
+   sparse-layout handling 
+   works for engineering PDFs 
+ 
+   IMPORTANT SHIFT 
+You are no longer building: 
+table extractor 
+You are now building: 
+layout-aware document intelligence pipeline    
+ 
+   YOU ARE NOW HERE 
+   DAY 5 COMPLETE 
+`` 
+Next: 
+DAY 6 
+→ schema layer 
+→ metadata extraction 
+→ DuckDB 
+→ analytics-ready records 
+ 
+        DAY 6 — FINAL CLEAN GENERIC FILTERING LAYER (YOUR TEMPLATE) 
+   GOAL 
+Move from: 
+RAW extracted tables    
+to: 
+clean retrieval-ready tables    
+WITHOUT: 
+• hardcoding   
+• anchors   
+• thermal-specific logic   
+• modifying raw extraction   
+ 
+   WHAT DAY 6 DOES 
+   removes fully empty rows 
+   removes fully empty columns 
+   removes useless single-row tables 
+   removes useless single-column tables 
+   preserves all real data 
+   keeps extraction generic 
+   improves future LLM retrieval quality 
+ 
+   FINAL TEMPLATE STRUCTURE 
+app/ 
+├── parser/ 
+│   ├── pdfplumber_table.py 
+│   ├── table_segmenter.py 
+│   ├── semantic_propagator.py 
+│   ├── table_normalizer.py 
+│   ├── quality_scorer.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    
+│ 
+├── tests/ 
+│   ├── test_ingestion.py    
+ 
+   STEP 1 — quality_scorer.py 
+     app/parser/quality_scorer.py 
+import pandas as pd 
+ 
+def filter_useful_tables(tables): 
+ 
+    useful = [] 
+ 
+    for t in tables: 
+ 
+        df = t["df"].copy() 
+ 
+        #    normalize empty values 
+        df = df.map( 
+            lambda x: pd.NA 
+            if str(x).strip().lower() 
+            in ["nan" , "none" , ""] 
+            else x 
+        ) 
+ 
+        #    remove fully empty columns 
+        df = df.dropna(axis=1, how="all") 
+ 
+        #    remove fully empty rows 
+        df = df.dropna(axis=0, how="all") 
+ 
+        rows, cols = df.shape 
+ 
+        #    skip useless tiny tables 
+        if rows <= 1: 
+            continue 
+ 
+        if cols <= 1: 
+            continue 
+ 
+        #    update cleaned dataframe 
+        t["df"] = df 
+ 
+        useful.append(t) 
+ 
+    return useful 
+ 
+   STEP 2 — UPDATE pipeline.py 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+from app.parser.quality_scorer import ( 
+    filter_useful_tables 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    #    page text 
+    pages = build_page_view(file_path) 
+ 
+    #    raw table extraction 
+    raw_tables = extract_tables_pdf(file_path) 
+ 
+    #    structural normalization 
+    normalized_tables = normalize_tables( 
+        raw_tables 
+    ) 
+ 
+    #    final retrieval-ready filtering 
+    useful_tables = filter_useful_tables( 
+        normalized_tables 
+    ) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": useful_tables 
+    } 
+ 
+   STEP 3 — FINAL TEST FILE 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+`` 
+ 
+   WHAT THIS FINAL DAY 6 FIXES 
+   Before 
+0 1 2 3 4 5 6 7 8 
+NaN NaN NaN everywhere 
+tiny useless tables 
+ 
+   After 
+   only meaningful rows 
+   only meaningful columns 
+   all real data preserved 
+   cleaner dataframe 
+   retrieval-ready tables 
+ 
+   IMPORTANT DESIGN DECISION 
+Extraction Layer 
+preserve everything    
+`` 
+Filtering Layer 
+clean retrieval noise    
+`` 
+This separation is correct architecture. 
+ 
+   CURRENT PIPELINE (NOW GOOD) 
+PDF 
+↓ 
+PyMuPDF text extraction    
+↓ 
+pdfplumber table extraction    
+↓ 
+structural segmentation    
+↓ 
+semantic propagation    
+↓ 
+retrieval filtering    
+↓ 
+LLM-ready tables    
+ 
+   YOU ARE NOW HERE 
+   DAY 6 COMPLETE 
+Next: 
+DAY 7 
+→ embeddings 
+→ ChromaDB 
+→ semantic retrieval 
+→ RAG pipeline 
+ 
+        DAY 7 — EMBEDDINGS + CHROMADB + SEMANTIC RETRIEVAL 
+   GOAL 
+Move from: 
+clean tables    
+to: 
+semantic searchable engineering knowledge base    
+ 
+   DAY 7 ARCHITECTURE 
+PDF 
+↓ 
+Tables 
+↓ 
+Clean tables 
+↓ 
+Chunking 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Semantic Search 
+ 
+   WHAT DAY 7 ADDS 
+   embedding generation 
+   ChromaDB vector store 
+   chunk creation 
+   semantic retrieval 
+   similarity search 
+   engineering query search 
+   RAG foundation 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── embeddings/ 
+│   ├── embedder.py    
+│   ├── chunker.py    
+│   ├── vectordb.py    
+│ 
+├── query/ 
+│   ├── semantic_search.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+ 
+   STEP 1 — INSTALL 
+pip install chromadb sentence-transformers 
+ 
+   STEP 2 — CHUNKER 
+     app/embeddings/chunker.py 
+def dataframe_to_chunks(table): 
+ 
+    chunks = [] 
+ 
+    df = table["df"] 
+ 
+    page = table["page"] 
+ 
+    table_id = table["table_id"] 
+ 
+    for idx, row in df.iterrows(): 
+ 
+        values = [ 
+            str(v) 
+            for v in row.values 
+        ] 
+ 
+        text = " | " .join(values) 
+ 
+        chunks.append({ 
+            "id": f"{table_id}row{idx}" , 
+            "text": text, 
+            "metadata": { 
+                "page": page, 
+                "table_id": table_id 
+            } 
+        }) 
+ 
+    return chunks 
+ 
+   STEP 3 — EMBEDDER 
+     app/embeddings/embedder.py 
+from sentence_transformers import ( 
+    SentenceTransformer 
+) 
+ 
+model = SentenceTransformer( 
+    "all-MiniLM-L6-v2" 
+) 
+ 
+def create_embedding(text): 
+ 
+    return model.encode(text).tolist() 
+ 
+   STEP 4 — CHROMADB 
+     app/embeddings/vectordb.py 
+import chromadb 
+ 
+client = chromadb.PersistentClient( 
+    path=" ./chroma_db" 
+) 
+ 
+collection = client.get_or_create_collection( 
+    name="dvp_tables" 
+) 
+ 
+def store_chunks(chunks): 
+ 
+    ids = [] 
+    docs = [] 
+    metas = [] 
+ 
+    for chunk in chunks: 
+ 
+        ids.append(chunk["id"]) 
+ 
+        docs.append(chunk["text"]) 
+ 
+        metas.append(chunk["metadata"]) 
+ 
+    collection.add( 
+        ids=ids, 
+        documents=docs, 
+        metadatas=metas 
+    ) 
+ 
+   STEP 5 — SEMANTIC SEARCH 
+     app/query/semantic_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+def semantic_search(query, top_k=5): 
+ 
+    results = collection.query( 
+        query_texts=[query], 
+        n_results=top_k 
+    ) 
+ 
+    return results 
+ 
+   STEP 6 — UPDATE PIPELINE 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+from app.parser.quality_scorer import ( 
+    filter_useful_tables 
+) 
+ 
+from app.embeddings.chunker import ( 
+    dataframe_to_chunks 
+) 
+ 
+from app.embeddings.vectordb import ( 
+    store_chunks 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    raw_tables = extract_tables_pdf( 
+        file_path 
+    ) 
+ 
+    normalized_tables = normalize_tables( 
+        raw_tables 
+    ) 
+ 
+    useful_tables = filter_useful_tables( 
+        normalized_tables 
+    ) 
+ 
+    all_chunks = [] 
+ 
+    for table in useful_tables: 
+ 
+        chunks = dataframe_to_chunks( 
+            table 
+        ) 
+ 
+        all_chunks.extend(chunks) 
+ 
+    store_chunks(all_chunks) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": useful_tables, 
+        "chunks": all_chunks 
+    } 
+ 
+   STEP 7 — TEST INGESTION 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+print("\n   TOTAL CHUNKS:") 
+print(len(result["chunks"])) 
+ 
+   STEP 8 — TEST SEARCH 
+     tests/test_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+results = semantic_search( 
+    "maximum front pad temperature" 
+) 
+ 
+print(results) 
+ 
+   EXPECTED RESULT 
+Front pad peak temperature | Maximum | 163 | 179 | 188 
+retrieved semantically    
+ 
+   WHAT DAY 7 ACHIEVES 
+   engineering semantic search 
+   vector database 
+   embeddings 
+   retrieval layer 
+   RAG foundation 
+   scalable architecture 
+ 
+   YOUR SYSTEM NOW 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Chunking 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Semantic Search    
+`` 
+ 
+   YOU ARE NOW HERE 
+   DAY 7 COMPLETE 
+Next: 
+DAY 8 
+→ Hybrid Search 
+→ BM25 + Vector 
+→ Metadata Filtering 
+→ Better engineering retrieval 
+ 
+        DAY 10 — DUCKDB + STRUCTURED ANALYTICS + ENGINEERING QUERY ENGINE 
+   GOAL 
+Move from: 
+RAG search    
+to: 
+structured engineering analytics    
+ 
+   WHY DAY 10 IS IMPORTANT 
+Current system: 
+LLM retrieval works    
+BUT: 
+LLM is weak for exact calculations   
+aggregations   
+comparisons   
+engineering analytics   
+Example: 
+Which condition has highest brake temperature? 
+Average CDT across reports? 
+Compare GHD vs HSD? 
+LLM alone is unreliable. 
+ 
+   DAY 10 FIXES 
+   DuckDB structured storage 
+   SQL querying 
+   engineering analytics 
+   exact numeric calculations 
+   metadata-aware filtering 
+   hybrid RAG + SQL 
+ 
+   DAY 10 ARCHITECTURE 
+PDF 
+↓ 
+Extraction 
+↓ 
+Tables 
+↓ 
+Chunks 
+↓ 
+ChromaDB    semantic 
+ 
+AND 
+ 
+↓ 
+Structured Records 
+↓ 
+DuckDB    analytics 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── storage/ 
+│   ├── duckdb_store.py    
+│ 
+├── analytics/ 
+│   ├── analytics_engine.py    
+│ 
+├── query/ 
+│   ├── sql_query.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+ 
+   STEP 1 — INSTALL 
+pip install duckdb 
+ 
+   STEP 2 — DUCKDB STORAGE 
+     app/storage/duckdb_store.py 
+import duckdb 
+ 
+conn = duckdb.connect( 
+    "engineering.db" 
+) 
+ 
+def initialize_db(): 
+ 
+    conn.execute(""" 
+    CREATE TABLE IF NOT EXISTS engineering_chunks ( 
+ 
+        chunk_id TEXT, 
+        page INTEGER, 
+        table_id TEXT, 
+        content TEXT 
+    ) 
+    """) 
+ 
+def insert_chunks(chunks): 
+ 
+    for chunk in chunks: 
+ 
+        conn.execute(""" 
+        INSERT INTO engineering_chunks 
+        VALUES (?, ?, ?, ?) 
+        """ , ( 
+ 
+            chunk["id"], 
+ 
+            chunk["metadata"]["page"], 
+ 
+            chunk["metadata"]["table_id"], 
+ 
+            chunk["text"] 
+        )) 
+ 
+   STEP 3 — STORE INTO DUCKDB 
+     app/ingestion/pipeline.py 
+Add: 
+from app.storage.duckdb_store import ( 
+    initialize_db, 
+    insert_chunks 
+) 
+ 
+Add before return: 
+initialize_db() 
+ 
+insert_chunks(all_chunks) 
+ 
+   STEP 4 — SQL QUERY ENGINE 
+     app/query/sql_query.py 
+from app.storage.duckdb_store import ( 
+    conn 
+) 
+ 
+def run_sql(query): 
+ 
+    result = conn.execute(query) 
+ 
+    return result.fetchall() 
+ 
+   STEP 5 — ANALYTICS ENGINE 
+     app/analytics/analytics_engine.py 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+def get_temperature_rows(): 
+ 
+    query = """ 
+    SELECT * 
+    FROM engineering_chunks 
+    WHERE LOWER(content) 
+    LIKE '%temperature%' 
+    """ 
+ 
+    return run_sql(query) 
+ 
+   STEP 6 — TEST SQL 
+     tests/test_sql.py 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+result = run_sql(""" 
+ 
+SELECT * 
+FROM engineering_chunks 
+LIMIT 10 
+ 
+""") 
+ 
+print(result) 
+ 
+   STEP 7 — TEST ANALYTICS 
+     tests/test_analytics.py 
+from app.analytics.analytics_engine import ( 
+    get_temperature_rows 
+) 
+ 
+results = get_temperature_rows() 
+ 
+for r in results: 
+ 
+    print(r) 
+ 
+   WHAT DAY 10 ACHIEVES 
+   exact SQL filtering 
+   engineering analytics 
+   numeric querying 
+   scalable storage 
+   metadata filtering 
+   hybrid SQL + RAG 
+ 
+   HUGE ARCHITECTURE SHIFT 
+Before: 
+LLM-only retrieval 
+Now: 
+Semantic AI    
++ 
+Structured Analytics    
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings → ChromaDB    
+ 
+AND 
+ 
+↓ 
+Structured Storage → DuckDB    
+ 
+   EXAMPLE FUTURE QUERIES 
+SELECT * 
+FROM engineering_chunks 
+WHERE content LIKE '%Maximum%' 
+ 
+SELECT COUNT(*) 
+FROM engineering_chunks 
+ 
+SELECT * 
+FROM engineering_chunks 
+WHERE page = 6 
+ 
+   WHY THIS IS POWERFUL 
+Now your system supports: 
+   semantic retrieval 
+   exact retrieval 
+   analytics 
+   engineering computations 
+   reporting 
+   dashboarding 
+ 
+   YOU ARE NOW HERE 
+   DAY 10 COMPLETE 
+Next: 
+DAY 11 
+→ LangGraph agent 
+→ tool calling 
+→ SQL + RAG orchestration 
+→ engineering copilot workflows 
+ 
+        DAY 11 — LANGGRAPH AGENT + TOOL CALLING + SQL/RAG ORCHESTRATION 
+   GOAL 
+Move from: 
+manual retrieval    
+to: 
+AI engineering copilot    
+`` 
+that can: 
+   decide when to use RAG 
+   decide when to use SQL 
+   combine both 
+   answer engineering questions intelligently 
+ 
+   DAY 11 ARCHITECTURE 
+User Question 
+     ↓ 
+LangGraph Agent    
+     ↓ 
+Tool Selection 
+ 
+┌───────────────┬───────────────┐ 
+│               │               │ 
+RAG Search    SQL Search     Hybrid 
+│               │               │ 
+└───────────────┴───────────────┘ 
+         ↓ 
+Context Assembly 
+         ↓ 
+Qwen2.5 
+         ↓ 
+Final Engineering Answer 
+ 
+   WHAT DAY 11 ADDS 
+   LangGraph agent 
+   tool calling 
+   query routing 
+   SQL orchestration 
+   RAG orchestration 
+   engineering copilot workflow 
+   intelligent retrieval selection 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── agent/ 
+│   ├── tools.py    
+│   ├── router.py    
+│   ├── graph.py    
+│   ├── ask.py    
+`` 
+ 
+   STEP 1 — INSTALL 
+pip install langgraph langchain 
+ 
+   STEP 2 — CREATE TOOLS 
+     app/agent/tools.py 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+from app.query.structured_search import ( 
+    structured_search 
+) 
+ 
+def rag_tool(query): 
+ 
+    results = hybrid_search(query) 
+ 
+    return { 
+        "tool": "rag" , 
+        "results": results 
+    } 
+ 
+def sql_tool(query): 
+ 
+    results = structured_search( 
+        keyword=query 
+    ) 
+ 
+    return { 
+        "tool": "sql" , 
+        "results": results 
+    } 
+ 
+   STEP 3 — QUERY ROUTER 
+     app/agent/router.py 
+def route_query(query): 
+ 
+    query = query.lower() 
+ 
+    sql_keywords = [ 
+ 
+        "count" , 
+        "maximum" , 
+        "minimum" , 
+        "average" , 
+        "compare" , 
+        "page" 
+ 
+    ] 
+ 
+    for k in sql_keywords: 
+ 
+        if k in query: 
+            return "sql" 
+ 
+    return "rag" 
+ 
+   STEP 4 — LANGGRAPH WORKFLOW 
+     app/agent/graph.py 
+from app.agent.router import ( 
+    route_query 
+) 
+ 
+from app.agent.tools import ( 
+    rag_tool, 
+    sql_tool 
+) 
+ 
+def run_agent(query): 
+ 
+    route = route_query(query) 
+ 
+    if route == "sql": 
+ 
+        return sql_tool(query) 
+ 
+    return rag_tool(query) 
+ 
+   STEP 5 — FINAL AGENT 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+def ask_question(query): 
+ 
+    tool_output = run_agent(query) 
+ 
+    context = "" 
+ 
+    #    RAG context 
+    if tool_output["tool"] == "rag": 
+ 
+        for r in tool_output["results"]: 
+ 
+            context += ( 
+                r["document"] + "\n" 
+            ) 
+ 
+    #    SQL context 
+    else: 
+ 
+        for r in tool_output["results"]: 
+ 
+            context += ( 
+                str(r) + "\n" 
+            ) 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering assistant. 
+ 
+Use ONLY the provided context. 
+ 
+Context: 
+{context} 
+ 
+Question: 
+{query} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 6 — TEST AGENT 
+     main.py 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+while True: 
+ 
+    query = input("\nAsk: ") 
+ 
+    if query.lower() == "exit": 
+        break 
+ 
+    response = ask_question(query) 
+ 
+    print("\n=== RESPONSE ===\n") 
+ 
+    print(response) 
+ 
+ 
+   EXAMPLE FLOW 
+ 
+Query 1 
+What is front pad maximum temperature? 
+Agent decides: 
+   RAG search 
+because semantic retrieval better. 
+ 
+Query 2 
+Count all temperature rows 
+Agent decides: 
+   SQL search 
+because structured analytics better. 
+ 
+   WHY DAY 11 IS BIG 
+Before: 
+manual pipelines 
+Now: 
+AI decides retrieval strategy    
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+ChromaDB    
+↓ 
+DuckDB    
+↓ 
+LangGraph Agent    
+↓ 
+Qwen2.5    
+ 
+   YOU NOW HAVE 
+   local engineering copilot 
+   hybrid retrieval agent 
+   semantic + SQL orchestration 
+   tool-calling workflow 
+   enterprise-style RAG architecture 
+ 
+   YOU ARE NOW HERE 
+   DAY 11 COMPLETE 
+Next: 
+DAY 12 
+→ conversational memory 
+→ multi-step reasoning 
+→ engineering workflows 
+→ report summarization 
+→ recommendation engine 
+ 
+        DAY 12 — CONVERSATION MEMORY + QUERY REWRITER + MULTI-TURN ENGINEERING COPILOT 
+   GOAL 
+Move from: 
+single-turn QA    
+to: 
+multi-turn engineering copilot    
+that supports: 
+   follow-up questions 
+   conversational memory 
+   contextual retrieval 
+   engineering discussion continuity 
+   report summarization 
+   conversational RAG 
+ 
+   WHY DAY 12 IS IMPORTANT 
+Current system: 
+Q1 → retrieve → answer 
+BUT follow-up questions fail: 
+Q1: What is front pad maximum temperature? 
+Q2: Compare with rear liner temperature. 
+because retrieval only sees: 
+Compare with rear liner temperature 
+without previous context. 
+ 
+   DAY 12 FIXES 
+   session memory 
+   query rewriting 
+   context-aware retrieval 
+   multi-turn reasoning 
+   engineering workflow continuity 
+ 
+   DAY 12 ARCHITECTURE 
+User Question 
+      ↓ 
+Conversation Memory    
+      ↓ 
+Query Rewriter    
+      ↓ 
+Router    
+      ↓ 
+RAG / SQL Retrieval    
+      ↓ 
+Context Builder    
+      ↓ 
+Qwen2.5    
+      ↓ 
+Store Conversation    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── memory/ 
+│   ├── session_memory.py    
+│   ├── query_rewriter.py    
+│ 
+├── agent/ 
+│   ├── ask.py    MODIFY 
+│ 
+├── summarizer/ 
+│   ├── report_summary.py    
+│ 
+├── tests/ 
+│   ├── test_summary.py    
+ 
+   STEP 1 — SESSION MEMORY 
+     app/memory/session_memory.py 
+conversation_history = [] 
+ 
+def add_message(role, content): 
+ 
+    conversation_history.append({ 
+        "role": role, 
+        "content": content 
+    }) 
+ 
+def get_history(): 
+ 
+    return conversation_history 
+ 
+def clear_history(): 
+ 
+    conversation_history.clear() 
+ 
+   STEP 2 — QUERY REWRITER 
+     app/memory/query_rewriter.py 
+from app.memory.session_memory import ( 
+    get_history 
+) 
+ 
+def rewrite_query(current_query): 
+ 
+    history = get_history() 
+ 
+    #    previous user queries 
+    previous_queries = [ 
+ 
+        h["content"] 
+ 
+        for h in history 
+ 
+        if h["role"] == "user" 
+    ] 
+ 
+    #    no history 
+    if not previous_queries: 
+ 
+        return current_query 
+ 
+    previous_query = previous_queries[-1] 
+ 
+    #    avoid duplicate expansion 
+    if current_query.lower() in previous_query.lower(): 
+ 
+        return current_query 
+ 
+    #    contextual rewrite 
+    rewritten = ( 
+        previous_query 
+        + " " 
+        + current_query 
+    ) 
+ 
+    return rewritten 
+ 
+   STEP 3 — MODIFY ask.py 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+from app.memory.session_memory import ( 
+    add_message 
+) 
+ 
+from app.memory.query_rewriter import ( 
+    rewrite_query 
+) 
+ 
+def ask_question(query): 
+ 
+    #    store user query 
+    add_message( 
+        "user" , 
+        query 
+    ) 
+ 
+    #    rewrite using conversation 
+    enhanced_query = rewrite_query( 
+        query 
+    ) 
+ 
+    #    retrieval 
+    tool_output = run_agent( 
+        enhanced_query 
+    ) 
+ 
+    context = "" 
+ 
+    for r in tool_output["results"]: 
+ 
+        if isinstance(r, dict): 
+ 
+            context += ( 
+                str( 
+                    r.get("document" , "") 
+                ) 
+                + "\n" 
+            ) 
+ 
+        else: 
+ 
+            context += ( 
+                str(r) 
+                + "\n" 
+            ) 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering assistant. 
+ 
+Answer ONLY from the provided context. 
+ 
+If answer is unavailable say: 
+"Answer not found in context. " 
+ 
+==================== 
+CONTEXT 
+==================== 
+ 
+{context} 
+ 
+==================== 
+QUESTION 
+==================== 
+ 
+{query} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    answer = response["message"]["content"] 
+ 
+    #    store assistant response 
+    add_message( 
+        "assistant" , 
+        answer 
+    ) 
+ 
+    return answer 
+ 
+   STEP 4 — REPORT SUMMARIZER 
+     app/summarizer/report_summary.py 
+import ollama 
+ 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+def summarize_report(): 
+ 
+    rows = run_sql(""" 
+ 
+    SELECT content 
+    FROM engineering_chunks 
+    LIMIT 100 
+ 
+    """) 
+ 
+    combined = "\n" .join( 
+        r[0] 
+        for r in rows 
+    ) 
+ 
+    prompt = f""" 
+ 
+Summarize this automotive engineering report. 
+ 
+Focus on: 
+- brake system 
+- temperatures 
+- key observations 
+- important values 
+- testing conditions 
+ 
+Report Content: 
+{combined} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 5 — UPDATE main.py 
+     main.py 
+import os 
+ 
+from app.ingestion.pipeline import ( 
+    process_pdf 
+) 
+ 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+from app.memory.session_memory import ( 
+    clear_history 
+) 
+ 
+from app.summarizer.report_summary import ( 
+    summarize_report 
+) 
+ 
+PDF_PATH = r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE 
+THERMAL MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+ 
+#    ingest once 
+if not os.path.exists("chroma_db"): 
+ 
+    print("\n   First-time ingestion started...\n") 
+ 
+    process_pdf(PDF_PATH) 
+ 
+    print("\n   Ingestion completed.\n") 
+ 
+else: 
+ 
+    print("\n   Existing DB found. Skipping ingestion.\n") 
+ 
+#    chat loop 
+while True: 
+ 
+    query = input("\nAsk: ") 
+ 
+    if query.lower() == "exit": 
+        break 
+ 
+    #    clear memory 
+    if query.lower() == "clear": 
+ 
+        clear_history() 
+ 
+        print("\n   Memory cleared.\n") 
+ 
+        continue 
+ 
+    #    summarize report 
+    if query.lower() == "summary": 
+ 
+        summary = summarize_report() 
+ 
+        print("\n=== SUMMARY ===\n") 
+ 
+        print(summary) 
+ 
+        continue 
+ 
+    response = ask_question(query) 
+ 
+    print("\n=== RESPONSE ===\n") 
+ 
+    print(response) 
+ 
+   EXAMPLE MULTI-TURN FLOW 
+ 
+USER 
+What is front pad maximum temperature? 
+ 
+ASSISTANT 
+163, 179, 188 deg C 
+ 
+USER 
+Compare with rear liner temperature 
+ 
+INTERNAL QUERY REWRITE 
+What is front pad maximum temperature? 
+Compare with rear liner temperature 
+ 
+ASSISTANT 
+Front pad maximum temperatures: 
+163, 179, 188 deg C 
+ 
+Rear liner maximum temperatures: 
+153, 153, 146 deg C 
+ 
+   WHAT DAY 12 ACHIEVES 
+   conversational memory 
+   follow-up reasoning 
+   contextual retrieval 
+   engineering dialogue 
+   report summarization 
+   multi-turn RAG 
+   query rewriting 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+DuckDB 
+↓ 
+Hybrid Retrieval 
+↓ 
+Agent Routing 
+↓ 
+Conversation Memory    
+↓ 
+Query Rewriter    
+↓ 
+Qwen2.5    
+ 
+   YOU ARE NOW HERE 
+   DAY 12 COMPLETE 
+Next: 
+DAY 13 
+→ engineering workflow agents 
+→ anomaly detection 
+→ recommendation engine 
+→ comparative analysis 
+→ autonomous report insights 
+ 
+        DAY 13 — GENERIC REASONING + TOOL ORCHESTRATION + CONTEXT INTELLIGENCE 
+   GOAL 
+Move from: 
+retrieval + memory    
+to: 
+generic engineering intelligence system    
+WITHOUT: 
+• hardcoded thresholds   
+• metric-specific logic   
+• temperature rules   
+• domain assumptions   
+ 
+   CORE IDEA OF NEW DAY 13 
+Python should NOT do engineering reasoning. 
+Instead: 
+Python → orchestration    
+LLM → reasoning    
+ 
+   WHAT DAY 13 ADDS 
+   structured context intelligence 
+   dynamic reasoning prompts 
+   tool orchestration 
+   generic engineering analysis 
+   context compression 
+   deduplication 
+   insight generation 
+   recommendation generation 
+WITHOUT hardcoding. 
+ 
+   DAY 13 ARCHITECTURE 
+User Query 
+      ↓ 
+Conversation Memory    
+      ↓ 
+QueryRetriever   Query Rewriter    
+      ↓ 
+Context Deduplicator    
+      ↓ 
+Structured Context Builder    
+      ↓ 
+Reasoning Prompt Generator    
+      ↓ 
+Qwen2.5    
+      ↓ 
+ 
+   IMPORTANT SHIFT 
+OLD DAY 13: 
+Python decides anomaly   
+NEW DAY 13: 
+LLM infers anomaly    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── context/ 
+│   ├── context_builder.py    
+│   ├── context_deduplicator.py    
+│   ├── reasoning_prompt.py    
+│ 
+├── agent/ 
+│   ├── ask.py    MODIFY 
+ 
+   STEP 1 — CONTEXT DEDUPLICATOR 
+     app/context/context_deduplicator.py 
+def deduplicate_context(results): 
+ 
+    unique = [] 
+ 
+    seen = set() 
+ 
+    for r in results: 
+ 
+        if isinstance(r, dict): 
+ 
+            text = str( 
+                r.get("document" , "") 
+            ).strip() 
+ 
+        else: 
+ 
+            text = str(r).strip() 
+ 
+        #    skip duplicates 
+        if text in seen: 
+            continue 
+ 
+        seen.add(text) 
+ 
+        unique.append(text) 
+ 
+    return unique 
+ 
+   STEP 2 — STRUCTURED CONTEXT BUILDER 
+     app/context/context_builder.py 
+def build_structured_context(chunks): 
+ 
+    sections = [] 
+ 
+    for idx, chunk in enumerate(chunks): 
+ 
+        block = f""" 
+ 
+[Context {idx+1}] 
+ 
+{chunk} 
+ 
+""" 
+ 
+        sections.append(block) 
+ 
+    return "\n" .join(sections) 
+ 
+   STEP 3 — REASONING PROMPT GENERATOR 
+     app/context/reasoning_prompt.py 
+def build_reasoning_prompt( 
+ 
+    query, 
+    context 
+ 
+): 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering copilot. 
+ 
+Use ONLY the provided context. 
+ 
+Perform: 
+- engineering reasoning 
+- comparisons 
+- observations 
+- trend analysis 
+- recommendations 
+ 
+DO NOT use external knowledge. 
+ 
+If information is unavailable, 
+say: 
+"Answer not found in context. " 
+ 
+==================== 
+ENGINEERING CONTEXT 
+==================== 
+ 
+{context} 
+ 
+==================== 
+QUESTION 
+==================== 
+ 
+{query} 
+ 
+==================== 
+RESPONSE FORMAT 
+==================== 
+ 
+1. Direct Answer 
+2. Engineering Observations 
+3. Comparative Insights 
+4. Recommendations 
+ 
+""" 
+ 
+    return prompt 
+`` 
+ 
+   STEP 4 — MODIFY ask.py 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+from app.memory.session_memory import ( 
+    add_message 
+) 
+ 
+from app.memory.query_rewriter import ( 
+    rewrite_query 
+) 
+ 
+from app.context.context_deduplicator import ( 
+    deduplicate_context 
+) 
+ 
+from app.context.context_builder import ( 
+    build_structured_context 
+) 
+ 
+from app.context.reasoning_prompt import ( 
+    build_reasoning_prompt 
+) 
+ 
+def ask_question(query): 
+ 
+    #    store query 
+    add_message( 
+        "user" , 
+        query 
+    ) 
+ 
+    #    rewrite using memory 
+    enhanced_query = rewrite_query( 
+        query 
+    ) 
+ 
+    #    retrieval 
+    tool_output = run_agent( 
+        enhanced_query 
+    ) 
+ 
+    #    deduplicate 
+    cleaned_chunks = deduplicate_context( 
+        tool_output["results"] 
+    ) 
+ 
+    #    structured context 
+    context = build_structured_context( 
+        cleaned_chunks 
+    ) 
+ 
+    #    reasoning prompt 
+    prompt = build_reasoning_prompt( 
+        query, 
+        context 
+    ) 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    answer = response["message"]["content"] 
+ 
+    #    save response 
+    add_message( 
+        "assistant" , 
+        answer 
+    ) 
+ 
+    return answer 
+ 
+   WHAT THIS NEW DAY 13 DOES 
+Instead of: 
+if value > threshold 
+you now do: 
+LLM-based reasoning    
+using: 
+• retrieved context 
+• comparisons 
+• observations 
+• engineering interpretation 
+ 
+   EXAMPLE 
+USER 
+Compare front pad and rear liner temperature 
+ 
+CONTEXT SENT TO QWEN 
+Front pad: 
+163 | 179 | 188 
+ 
+Rear liner: 
+153 | 153 | 146 
+ 
+QWEN REASONS 
+Front pad temperatures are consistently higher. 
+ 
+Possible braking system.Possible higher thermal loading observed 
+ 
+Review brake balance and cooling performance. 
+   NO hardcoded rules 
+   Generic reasoning 
+   Works for any engineering metric 
+ 
+   WHY THIS IS BETTER 
+This architecture is now: 
+   generic 
+   scalable 
+   multi-domain 
+   future-proof 
+   LLM-native 
+   retrieval-grounded 
+`` 
+instead of: 
+temperature-specific Python rules   
+ 
+   IMPORTANT DESIGN PRINCIPLE 
+   Python Responsibilities 
+   retrieval 
+   orchestration 
+   memory 
+   chunking 
+   storage 
+   context building 
+   tool execution 
+ 
+   LLM Responsibilities 
+   engineering reasoning 
+   comparisons 
+   observations 
+   recommendations 
+   interpretation 
+   analysis 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+DuckDB 
+↓ 
+Hybrid Retrieval 
+↓ 
+Conversation Memory 
+↓ 
+Query Rewriter 
+↓ 
+Context Intelligence    
+↓ 
+LLM Reasoning    
+↓ 
+Engineering Copilot    
+ 
+   YOU ARE NOW HERE 
+   DAY 13 COMPLETE 
+Next: 
+DAY 14 
+→ autonomous engineering workflows 
+→ multi-document reasoning 
+→ report comparison 
+→ dynamic tool planning 
+→ engineering dashboard 
+ 
+        DAY 14 — TABLE-NEIGHBORHOOD RETRIEVAL + CONTEXT EXPANSION 
+   GOAL 
+Move from: 
+row-level retrieval   
+to: 
+table-aware retrieval    
+so engineering relationships stay intact. 
+ 
+   WHAT DAY 14 FIXES 
+   average/max comparison 
+   front/rear comparison 
+   CDT/GHD/HSD understanding 
+   multi-row engineering reasoning 
+   weak isolated chunk retrieval 
+   incomplete context 
+ 
+   CORE IDEA 
+If one row is retrieved: 
+Front pad peak temp | Average 
+automatically retrieve: 
+neighbor rows 
+from same table 
+ 
+   NEW ARCHITECTURE 
+Semantic Retrieval 
+      ↓ 
+Neighbor Expansion    
+      ↓ 
+Deduplication    
+      ↓ 
+Structured Context    
+      ↓ 
+Qwen2.5    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── retrieval/ 
+│   ├── neighbor_retriever.py    
+│ 
+├── agent/ 
+│   ├── ask.py    MODIFY 
+ 
+   STEP 1 — CREATE NEIGHBOR RETRIEVER 
+     app/retrieval/neighbor_retriever.py 
+from app.storage.duckdb_store import ( 
+    conn 
+) 
+ 
+def get_neighbor_chunks( 
+ 
+    table_id, 
+    row_index, 
+    window=2 
+ 
+): 
+ 
+    min_row = max(0, row_index - window) 
+ 
+    max_row = row_index + window 
+ 
+    query = f""" 
+ 
+    SELECT content 
+    FROM engineering_chunks 
+ 
+    WHERE table_id = '{table_id}' 
+ 
+    AND CAST( 
+ 
+        regexp_extract( 
+            chunk_id, 
+            'row_(\d+)' , 
+            1 
+ 
+        ) AS INTEGER 
+ 
+    ) 
+ 
+    BETWEEN {min_row} AND {max_row} 
+ 
+    """ 
+ 
+    rows = conn.execute(query).fetchall() 
+ 
+    return [r[0] for r in rows] 
+ 
+   STEP 2 — MODIFY hybrid_search.py 
+     app/query/hybrid_search.py 
+Add import: 
+from app.retrieval.neighbor_retriever import ( 
+    get_neighbor_chunks 
+) 
+ 
+   ADD AFTER RERANKING 
+Replace: 
+return list(reranked[:5]) 
+WITH: 
+expanded_results = [] 
+ 
+for r in reranked[:5]: 
+ 
+    expanded_results.append(r) 
+ 
+    metadata = r["metadata"] 
+ 
+    table_id = metadata["table_id"] 
+ 
+    row_index = metadata.get( 
+        "row_index" , 
+        0 
+    ) 
+ 
+    neighbors = get_neighbor_chunks( 
+ 
+        table_id=table_id, 
+        row_index=row_index, 
+        window=2 
+ 
+    ) 
+ 
+    for n in neighbors: 
+ 
+        expanded_results.append({ 
+            "document": n, 
+            "metadata": metadata, 
+            "source": "neighbor" 
+        }) 
+ 
+return expanded_results 
+ 
+   STEP 3 — ENSURE ROW INDEX EXISTS 
+     app/embeddings/chunker.py 
+Make sure metadata contains: 
+"row_index": idx 
+ 
+   FINAL CHUNK FORMAT 
+chunks.append({ 
+ 
+    "id": f"{table_id}row{idx}" , 
+ 
+    "text": text, 
+ 
+    "metadata": { 
+ 
+        "page": page, 
+ 
+        "table_id": table_id, 
+ 
+        "row_index": idx, 
+ 
+        "source": "table" 
+    } 
+}) 
+ 
+   STEP 4 — DEDUPLICATION STILL USED 
+Your existing: 
+     context_deduplicator.py 
+already works. 
+No change needed    
+ 
+   STEP 5 — RUN 
+python main.py 
+ 
+   NOW TEST 
+Compare front pad and rear liner peak temperature at average 
+ 
+   BEFORE DAY 14 
+Retriever got only: 
+Front pad | Average 
+  incomplete context 
+ 
+   AFTER DAY 14 
+Retriever automatically expands: 
+Front pad | Average 
+Front pad | Maximum 
+Rear liner | Average 
+Rear liner | Maximum 
+   complete engineering neighborhood 
+ 
+   EXPECTED RESPONSE 
+Front pad average temperatures: 
+104 | 104 | 82 
+ 
+Rear liner average temperatures: 
+94 | 98 | 72 
+ 
+Observation: 
+Front pad temperatures are consistently higher. 
+ 
+Possible higher thermal loading observed 
+in front braking system. 
+ 
+   WHY THIS IS THE CORRECT SOLUTION 
+Engineering meaning exists in: 
+table structure    
+NOT isolated rows. 
+ 
+   IMPORTANT 
+This is: 
+   generic 
+   layout-aware 
+   no hardcoding 
+   works for any engineering table 
+   retrieval-native 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Hybrid Retrieval 
+↓ 
+Neighbor Expansion    
+↓ 
+Deduplication    
+↓ 
+Context Intelligence    
+↓ 
+Qwen2.5    
+ 
+   YOU ARE NOW HERE 
+   DAY 14 COMPLETE 
+Next: 
+DAY 15 
+→ multi-document reasoning 
+→ report comparison 
+→ cross-PDF retrieval 
+→ engineering workflow planning 
+→ autonomous tool selection 
+ 
+        DAY 8 — HYBRID RETRIEVAL + METADATA SEARCH 
+   GOAL 
+Move from: 
+semantic vector search only    
+to: 
+hybrid engineering retrieval    
+ 
+   DAY 8 ARCHITECTURE 
+User Query 
+   ↓ 
+Vector Search (BM25-like)Vector Search (semantic) 
+   + 
+Metadata Filtering 
+   ↓ 
+Combined Ranked Results 
+ 
+   + 
+ 
+   WHAT DAY 8 ADDS 
+   metadata-aware retrieval 
+   keyword search 
+   hybrid retrieval 
+   better engineering queries 
+   page filtering 
+   table filtering 
+   exact metric retrieval 
+   semantic + exact matching 
+ 
+   WHY DAY 8 IS IMPORTANT 
+Current Day 7: 
+semantic similarity only 
+Problem: 
+"Front pad max temp" 
+may retrieve: 
+rear liner temp   
+because embeddings are semantically close. 
+ 
+   Day 8 Fixes This 
+Combines: 
+semantic meaning    
++ 
+exact engineering terms    
+`` 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── query/ 
+│   ├── semantic_search.py 
+│   ├── keyword_search.py    NEW 
+│   ├── hybrid_search.py    NEW 
+│ 
+├── embeddings/ 
+│   ├── metadata_builder.py    NEW 
+ 
+   STEP 1 — ADD METADATA TO CHUNKS 
+     app/embeddings/chunker.py 
+Update: 
+chunks.append({ 
+    "id": f"{table_id}row{idx}" , 
+    "text": text, 
+    "metadata": { 
+        "page": page, 
+        "table_id": table_id 
+    } 
+}) 
+ 
+   TO 
+chunks.append({ 
+    "id": f"{table_id}row{idx}" , 
+    "text": text, 
+ 
+    "metadata": { 
+        "page": page, 
+        "table_id": table_id, 
+ 
+        #    searchable metadata 
+        "row_index": idx, 
+        "source": "table" 
+    } 
+}) 
+ 
+   STEP 2 — KEYWORD SEARCH 
+     app/query/keyword_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+def keyword_search(keyword): 
+ 
+    data = collection.get() 
+ 
+    results = [] 
+ 
+    docs = data["documents"] 
+    metas = data["metadatas"] 
+ 
+    for doc, meta in zip(docs, metas): 
+ 
+        if keyword.lower() in doc.lower(): 
+ 
+            results.append({ 
+                "document": doc, 
+                "metadata": meta 
+            }) 
+ 
+    return results 
+ 
+   STEP 3 — HYBRID SEARCH 
+     app/query/hybrid_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+from app.query.keyword_search import ( 
+    keyword_search 
+) 
+ 
+def hybrid_search(query): 
+ 
+    semantic = semantic_search( 
+        query, 
+        top_k=5 
+    ) 
+ 
+    keyword = keyword_search( 
+        query 
+    ) 
+ 
+    return { 
+        "semantic_results": semantic, 
+        "keyword_results": keyword 
+    } 
+ 
+   STEP 4 — TEST HYBRID SEARCH 
+     tests/test_hybrid_search.py 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+results = hybrid_search( 
+    "front pad maximum temperature" 
+) 
+ 
+print("\n=== SEMANTIC ===\n") 
+print(results["semantic_results"]) 
+ 
+print("\n=== KEYWORD ===\n") 
+print(results["keyword_results"]) 
+`` 
+ 
+FINAL semantic_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+from app.embeddings.embedder import ( 
+    create_embedding 
+) 
+ 
+def semantic_search(query, top_k=5): 
+ 
+    query_embedding = create_embedding( 
+        query 
+    ) 
+ 
+    results = collection.query( 
+        query_embeddings=[query_embedding], 
+        n_results=top_k 
+    ) 
+ 
+    return results 
+ 
+   EXPECTED RESULT 
+   Semantic 
+front pad peak temperature 
+rear liner temperature 
+ 
+   Keyword 
+Front pad peak temperature | Maximum | 163 | 179 | 188 
+ 
+   WHY HYBRID IS BETTER 
+Semantic search gives: 
+meaning similarity    
+ 
+Keyword search gives: 
+exact engineering terms    
+ 
+   COMBINED = MUCH BETTER RAG 
+Especially for: 
+   engineering metrics 
+   component names 
+   exact measurements 
+   conditions 
+   units 
+`` 
+ 
+   DAY 8 RESULT 
+Your system now supports: 
+   semantic retrieval 
+   exact retrieval 
+   metadata-aware retrieval 
+   engineering search 
+   hybrid retrieval 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Hybrid Retrieval    
+ 
+   YOU ARE NOW HERE 
+   DAY 8 COMPLETE 
+Next: 
+DAY 9 
+→ reranking 
+→ metadata filters 
+→ engineering-aware retrieval ranking 
+→ context assembly 
+ 
+        DAY 9 — RERANKING + CONTEXT ASSEMBLY + ENGINEERING RETRIEVAL 
+   GOAL 
+Move from: 
+retrieved chunks    
+to: 
+BEST engineering context for LLM    
+ 
+   WHY DAY 9 IS IMPORTANT 
+Current Day 8: 
+semantic retrieval    
+keyword retrieval    
+BUT: 
+results still noisy 
+duplicates exist 
+ranking weak 
+Example: 
+Average rows 
+Maximum rows 
+duplicate pages 
+partial matches 
+ 
+   DAY 9 FIXES 
+   reranking 
+   duplicate removal 
+   context assembly 
+   better LLM prompts 
+   cleaner final answers 
+ 
+   DAY 9 ARCHITECTURE 
+User Query 
+   ↓ 
+Semantic Retrieval 
+   + 
+Keyword Retrieval 
+   ↓ 
+Merge Results 
+   ↓ 
+Reranker    
+   ↓ 
+Deduplication    
+   ↓ 
+Context Builder    
+   ↓ 
+LLM Prompt    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── reranker/ 
+│   ├── rerank.py    
+│ 
+├── context/ 
+│   ├── context_builder.py    
+│ 
+├── query/ 
+│   ├── hybrid_search.py    MODIFY 
+│ 
+├── agent/ 
+│   ├── ask.py    NEW 
+ 
+   STEP 1 — INSTALL RERANKER 
+pip install sentence-transformers 
+ 
+   STEP 2 — RERANKER 
+     app/reranker/rerank.py 
+from sentence_transformers import ( 
+    CrossEncoder 
+) 
+ 
+reranker = CrossEncoder( 
+    "BAAI/bge-reranker-base" 
+) 
+ 
+def rerank_results(query, documents): 
+ 
+    pairs = [] 
+ 
+    for doc in documents: 
+        pairs.append([ 
+            query, 
+            doc["document"] 
+        ]) 
+ 
+    scores = reranker.predict(pairs) 
+ 
+    ranked = [] 
+ 
+    for doc, score in zip(documents, scores): 
+ 
+        doc["rerank_score"] = float(score) 
+ 
+        ranked.append(doc) 
+ 
+    ranked = sorted( 
+        ranked, 
+        key=lambda x: x["rerank_score"], 
+        reverse=True 
+    ) 
+ 
+    return ranked 
+ 
+   STEP 3 — IMPROVE HYBRID SEARCH 
+     app/query/hybrid_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+from app.query.keyword_search import ( 
+    keyword_search 
+) 
+ 
+from app.reranker.rerank import ( 
+    rerank_results 
+) 
+ 
+def hybrid_search(query): 
+ 
+    semantic = semantic_search( 
+        query, 
+        top_k=10 
+    ) 
+ 
+    semantic_docs = [] 
+ 
+    docs = semantic["documents"][0] 
+    metas = semantic["metadatas"][0] 
+ 
+    for doc, meta in zip(docs, metas): 
+ 
+        semantic_docs.append({ 
+            "document": doc, 
+            "metadata": meta, 
+            "source": "semantic" 
+        }) 
+ 
+    keyword_docs = keyword_search(query) 
+ 
+    combined = semantic_docs + keyword_docs 
+ 
+    #    deduplicate 
+    unique = {} 
+ 
+    for item in combined: 
+        unique[item["document"]] = item 
+ 
+    final_docs = list(unique.values()) 
+ 
+    #    rerank 
+    reranked = rerank_results( 
+        query, 
+        final_docs 
+    ) 
+ 
+    return reranked[:5] 
+ 
+   STEP 4 — CONTEXT BUILDER 
+     app/context/context_builder.py 
+def build_context(results): 
+ 
+    context = [] 
+ 
+    for idx, r in enumerate(results): 
+ 
+        chunk = f""" 
+[Context {idx+1}] 
+Page: {r['metadata']['page']} 
+ 
+{r['document']} 
+""" 
+ 
+        context.append(chunk) 
+ 
+    return "\n" .join(context) 
+ 
+   STEP 5 — QWEN QUERY AGENT 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+from app.context.context_builder import ( 
+    build_context 
+) 
+ 
+def ask_question(query): 
+ 
+    results = hybrid_search(query) 
+ 
+    context = build_context(results) 
+ 
+    prompt = f""" 
+You are an automotive engineering assistant. 
+ 
+Use ONLY the provided context. 
+ 
+Context: 
+{context} 
+ 
+Question: 
+{query} 
+""" 
+ 
+    response = ollama.chat( 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 6 — TEST AGENT 
+     tests/test_agent.py 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+response = ask_question( 
+    "What is the maximum front pad temperature?" 
+) 
+ 
+print("\n=== RESPONSE ===\n") 
+ 
+print(response) 
+ 
+   EXPECTED RESULT 
+The maximum front pad peak temperature observed: 
+ 
+CDT : 163 deg C 
+GHD : 179 deg C 
+HSD : 188 deg C 
+ 
+   WHAT DAY 9 ACHIEVES 
+   reranking 
+   context assembly 
+   engineering QA 
+   duplicate removal 
+   cleaner retrieval 
+   better answers 
+   local engineering copilot 
+ 
+   YOUR SYSTEM NOW 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Hybrid Search 
+↓ 
+Reranking    
+↓ 
+Context Builder    
+↓ 
+Qwen2.5    
+ 
+   YOU ARE NOW HERE 
+   DAY 9 COMPLETE 
+Next: 
+DAY 10 
+→ metadata-aware analytics 
+→ structured querying 
+→ engineering calculations 
+→ DuckDB integration 
+ 
+
+--- END OF FILE: merged_output.pdf ---
+
+
+--- START OF FILE: w1d1.pdf ---
+
+Perfect    — let’s rebuild Day 1 using YOUR current template + final architecture direction (pymupdf 
++ pdfplumber ready) 
+     This is clean, production-compatible Day 1 (no rework later) 
+ 
+           DAY 1 — PROJECT FOUNDATION (FINAL VERSION) 
+ 
+          GOAL (Day 1) 
+✔ Setup repo 
+✔ Setup folder structure (correct for future) 
+✔ Setup config (free/paid toggle) 
+✔ Setup API base 
+✔ Prepare for Day 2/3 (parser ready) 
+ 
+      FINAL FOLDER STRUCTURE (CREATE EXACT) 
+project_root/ 
+│ 
+├── app/ 
+│   ├── config.py    
+│ 
+│   ├── api/ 
+│   │   └── main.py    
+│ 
+│   ├── ingestion/ 
+│   │   └── pipeline.py    
+│ 
+│   ├── parser/ 
+│   │   ├── parser_router.py    
+│   │   ├── table_router.py    
+│   │   ├── pymupdf_parser.py   (Day 2) 
+│   │   ├── pdfplumber_table.py   (Day 3) 
+│   │   ├── gcp_parser.py    stub 
+│   │   ├── gcp_table_parser.py    stub 
+│ 
+│   ├── schema/ 
+│   │   ├── models.py    
+│   │   ├── mapper.py    
+│ 
+│   ├── storage/ 
+│   │   └── db.py    
+│ 
+│   ├── query/   (later) 
+│   ├── agent/   (later) 
+│   ├── models/   (later) 
+│ 
+├── tests/ 
+│   └── test_ingestion.py    
+│ 
+├── data/ 
+├── requirements.txt    
+└── .env 
+ 
+      STEP 1 — ENV SETUP 
+python -m venv venv 
+source venv/bin/activate   # or Windows 
+pip install fastapi uvicorn pymupdf pdfplumber duckdb pandas 
+ 
+      STEP 2 — CONFIG (VERY IMPORTANT) 
+     app/config.py 
+MODE = "free"   # change to "paid" later 
+ 
+      STEP 3 — API BASE 
+     app/api/main.py 
+from fastapi import FastAPI 
+ 
+app = FastAPI() 
+ 
+@app.get("/") 
+def health(): 
+    return {"status": "ok"} 
+ 
+   RUN 
+uvicorn app.api.main:app --reload 
+ 
+      STEP 4 — PARSER ROUTER (FUTURE READY) 
+     app/parser/parser_router.py 
+from app.config import MODE 
+ 
+def parse_document(file_path): 
+    if MODE == "paid": 
+        from app.parser.gcp_parser import parse_gcp 
+        return parse_gcp(file_path) 
+ 
+    # Day 2 will plug pymupdf here 
+    return { 
+        "titles": [], 
+        "text": [] 
+    } 
+ 
+      STEP 5 — TABLE ROUTER (FUTURE READY) 
+     app/parser/table_router.py 
+from app.config import MODE 
+ 
+def get_tables(file_path, parsed): 
+    if MODE == "paid": 
+        from app.parser.gcp_table_parser import gcp_table_extract 
+        return gcp_table_extract(file_path) 
+ 
+    # Day 3 will plug pdfplumber here 
+    return [] 
+ 
+      STEP 6 — PIPELINE (CORE FLOW) 
+     app/ingestion/pipeline.py 
+from app.parser.parser_router import parse_document 
+from app.parser.table_router import get_tables 
+ 
+def process_pdf(file_path): 
+    parsed = parse_document(file_path) 
+ 
+    tables = get_tables(file_path, parsed) 
+ 
+    return { 
+        "titles": parsed.get("titles" , []), 
+        "text": parsed.get("text" , []), 
+        "tables": tables 
+    } 
+ 
+      STEP 7 — STORAGE BASE (DuckDB) 
+     app/storage/db.py 
+import duckdb 
+ 
+conn = duckdb.connect("data.db") 
+ 
+conn.execute(""" 
+CREATE TABLE IF NOT EXISTS metrics ( 
+    component TEXT, 
+    value FLOAT, 
+    condition TEXT 
+) 
+""") 
+ 
+      STEP 8 — SCHEMA (INITIAL ONLY) 
+     app/schema/models.py 
+def create_record(component, value, condition): 
+    return { 
+        "component": component, 
+        "value": value, 
+        "condition": condition 
+    } 
+ 
+      STEP 9 — TEST FILE 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+print("\n=== OUTPUT ===\n") 
+print(result) 
+ 
+      STEP 10 — REQUIREMENTS FILE 
+     requirements.txt 
+fastapi 
+uvicorn 
+pymupdf 
+pdfplumber 
+duckdb 
+pandas 
+ 
+      DAY 1 OUTPUT (EXPECTED) 
+Run: 
+python -m tests.test_ingestion 
+     Output: 
+{ 
+  "titles": [], 
+  "text": [], 
+  "tables": [] 
+} 
+   THIS IS CORRECT FOR DAY 1 
+ 
+      WHERE YOU ARE AFTER DAY 1 
+Infra    
+Router    
+Pipeline    
+Storage    
+Parser   (next) 
+Tables   (next) 
+Schema   (next) 
+ 
+      WHAT COMES NEXT 
+        Day 2: 
+pymupdf (text extraction) 
+        Day 3: 
+pdfplumber (table extraction + cleaning) 
+ 
+      FINAL MESSAGE 
+     This Day 1 is: 
+✔ aligned with your architecture    
+✔ ready for real parser    
+✔ supports FREE + PAID    
+✔ no rework later    
+ 
+   Say Day 2         
+ 
+
+--- END OF FILE: w1d1.pdf ---
+
+
+--- START OF FILE: w1d2.pdf ---
+
+Perfect    — here is DAY 2 (FINAL, CORRECT, aligned with your working pdfplumber flow + template) 
+     Focus = ONLY TEXT EXTRACTION (PyMuPDF) 
+     No tables yet (Day 3) 
+ 
+           DAY 2 — TEXT EXTRACTION (PyMuPDF) 
+ 
+          WHERE WE ARE 
+Day 1    Infra ready 
+Day 2 ← YOU ARE HERE 
+Tables   (next) 
+Schema   
+ 
+          GOAL 
+PDF → clean text + titles    
+ 
+      FILES TO MODIFY 
+app/parser/ 
+  ├── parser_router.py    modify 
+  ├── pymupdf_parser.py    create 
+ 
+      STEP 1 — INSTALL (if not done) 
+pip install pymupdf 
+ 
+      STEP 2 — CREATE TEXT PARSER 
+     app/parser/pymupdf_parser.py 
+import fitz  # PyMuPDF 
+ 
+def parse_pymupdf(file_path): 
+    doc = fitz.open(file_path) 
+ 
+    titles = [] 
+    text = [] 
+ 
+    for page_num, page in enumerate(doc): 
+        content = page.get_text() 
+ 
+        if not content: 
+            continue 
+ 
+        lines = content.split("\n") 
+ 
+        for line in lines: 
+            line = line.strip() 
+ 
+            if not line: 
+                continue 
+ 
+            #    Title detection (important) 
+            if ( 
+                line.isupper() or 
+                "TEST REPORT" in line or 
+                "BRAKE" in line 
+            ): 
+                titles.append(line) 
+            else: 
+                text.append(line) 
+ 
+    return { 
+        "titles": titles, 
+        "text": text 
+    } 
+ 
+      STEP 3 — UPDATE ROUTER 
+     app/parser/parser_router.py 
+from app.config import MODE 
+from app.parser.pymupdf_parser import parse_pymupdf 
+from app.parser.gcp_parser import parse_gcp 
+ 
+def parse_document(file_path): 
+    if MODE == "paid": 
+        return parse_gcp(file_path) 
+ 
+    #    FREE MODE 
+    return parse_pymupdf(file_path) 
+ 
+      STEP 4 — PIPELINE (NO CHANGE) 
+     already correct: 
+parsed = parse_document(file_path) 
+ 
+      STEP 5 — TEST 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+print("\n=== TITLES ===\n" , result["titles"][:10]) 
+print("\n=== TEXT ===\n" , result["text"][:20]) 
+ 
+      EXPECTED OUTPUT 
+ 
+   TITLES 
+TPDS TEST REPORT    
+BRAKE THERMAL MAPPING    
+VEHICLE CONFIGURATION    
+ 
+   TEXT 
+Objective: To evaluate brake thermal mapping    
+Booster Size 9"    
+Front Brake Pad Grade Apache    
+ 
+      VERIFY (VERY IMPORTANT) 
+   You should see: 
+   100+ text lines (not empty) 
+   meaningful engineering text 
+   titles separated 
+ 
+  If you see: 
+[] empty   
+     then PyMuPDF not working 
+ 
+      FINAL STATE AFTER DAY 2 
+Text    
+Titles    
+Parser    (stable) 
+Tables   (next day) 
+ 
+      WHY THIS STEP MATTERS 
+     This text will later give: 
+✔ metadata (component, dvp) 
+✔ fallback when tables fail 
+✔ context for LLM 
+ 
+      NEXT 
+     DAY 3 (IMPORTANT) 
+pdfplumber tables + None cleaning (your breakthrough) 
+ 
+   Say: 
+Day 3 
+We’ll plug your working table extraction properly into system         
+ 
+
+--- END OF FILE: w1d2.pdf ---
+
+
+--- START OF FILE: w1d3.pdf ---
+
+   DAY 3 (MODIFIED FINAL VERSION) 
+     Goal: 
+PDF → Page-wise structured content 
+(Text + Tables + Page info) 
+ 
+   FILES 
+app/parser/ 
+  ├── pymupdf_parser.py 
+  ├── pdfplumber_table.py 
+  ├── page_builder.py      NEW 
+ 
+app/ingestion/ 
+  ├── pipeline.py 
+ 
+   app/parser/pymupdf_parser.py 
+import fitz 
+ 
+def parse_pymupdf(file_path): 
+    doc = fitz.open(file_path) 
+ 
+    pages = [] 
+ 
+    for i in range(doc.page_count): 
+        page = doc.load_page(i) 
+ 
+        text_lines = str( 
+            page.get_text("text") or "" 
+        ).splitlines() 
+ 
+        cleaned = [] 
+ 
+        for line in text_lines: 
+            line = line.strip() 
+ 
+            if line: 
+                cleaned.append(line) 
+ 
+        pages.append({ 
+            "page": i, 
+            "text": cleaned 
+        }) 
+ 
+    return pages 
+ 
+   app/parser/pdfplumber_table.py 
+import pdfplumber 
+ 
+def clean_row(row): 
+    return [ 
+        cell.strip() 
+        for cell in row 
+        if cell not in (None, "" , " ") 
+    ] 
+ 
+def extract_tables_pdf(file_path): 
+    tables = [] 
+ 
+    with pdfplumber.open(file_path) as pdf: 
+ 
+        for page_num, page in enumerate(pdf.pages): 
+ 
+            raw_tables = page.extract_tables() 
+ 
+            if not raw_tables: 
+                continue 
+ 
+            for table_id, table in enumerate(raw_tables): 
+ 
+                cleaned_table = [] 
+ 
+                for row in table: 
+                    cleaned = clean_row(row) 
+ 
+                    if len(cleaned) >= 2: 
+                        cleaned_table.append(cleaned) 
+ 
+                if len(cleaned_table) < 2: 
+                    continue 
+ 
+                tables.append({ 
+                    "page": page_num, 
+                    "table_id": f"page_{page_num}table{table_id}" , 
+                    "data": cleaned_table 
+                }) 
+ 
+                print(f"   Table extracted from page {page_num}") 
+ 
+    return tables 
+ 
+   app/parser/page_builder.py 
+from app.parser.pymupdf_parser import parse_pymupdf 
+from app.parser.pdfplumber_table import extract_tables_pdf 
+ 
+def build_page_view(file_path): 
+ 
+    parsed_pages = parse_pymupdf(file_path) 
+ 
+    extracted_tables = extract_tables_pdf(file_path) 
+ 
+    table_map = {} 
+ 
+    for t in extracted_tables: 
+        page = t["page"] 
+ 
+        if page not in table_map: 
+            table_map[page] = [] 
+ 
+        table_map[page].append(t) 
+ 
+    final_pages = [] 
+ 
+    for p in parsed_pages: 
+ 
+        page_num = p["page"] 
+ 
+        final_pages.append({ 
+            "page": page_num, 
+            "text": p["text"], 
+            "tables": table_map.get(page_num, []) 
+        }) 
+ 
+    return final_pages 
+ 
+   app/ingestion/pipeline.py 
+from app.parser.page_builder import build_page_view 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    return { 
+        "pages": pages 
+    } 
+ 
+   tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf("data/sample.pdf") 
+ 
+for page in result["pages"]: 
+ 
+    print(f"\n========== PAGE {page['page']} ==========\n") 
+ 
+    print("TEXT:\n") 
+ 
+    for line in page["text"][:10]: 
+        print(line) 
+ 
+    print("\nTABLES:\n") 
+ 
+    for table in page["tables"]: 
+ 
+        print("TABLE ID:" , table["table_id"]) 
+ 
+        for row in table["data"][:10]: 
+            print(row) 
+ 
+        print("------") 
+ 
+   OUTPUT YOU SHOULD GET 
+========== PAGE 0 ========== 
+ 
+TEXT: 
+TPDS 
+TEST REPORT 
+Objective: 
+... 
+ 
+TABLES: 
+ 
+TABLE ID: page_0_table_0 
+ 
+['P201 BRAKE TEMPERATURE MAPPING' , 'CDT' , 'GHD' , 'HSD'] 
+['Distance Covered (km)' , '149' , '243' , '264'] 
+['Front pad peak temperature' , '163' , '179' , '188'] 
+ 
+   WHAT DAY 3 ACHIEVES 
+✔ page-wise structure 
+✔ table-wise structure 
+✔ table_id 
+✔ page tracking 
+✔ clean extraction 
+✔ ready for normalization 
+ 
+   NEXT = DAY 4 
+     Day 4 will convert this: 
+['Front pad peak temperature' , '163' , '179' , '188'] 
+into: 
+{ 
+  "metric": "Front pad peak temperature" , 
+  "CDT": 163, 
+  "GHD": 179, 
+  "HSD": 188 
+} 
+and also: 
+table_type 
+source_pdf 
+metadata 
+normalized columns 
+        
+ 
+
+--- END OF FILE: w1d3.pdf ---
+
+
+--- START OF FILE: w1d4.pdf ---
+
+        DAY 4 — FINAL GENERIC TABLE RECONSTRUCTION (YOUR TEMPLATE) 
+   GOAL 
+PDF 
+↓ 
+Extract ALL tables 
+↓ 
+Preserve ALL rows/columns 
+↓ 
+No hardcoding 
+↓ 
+No table-specific logic 
+↓ 
+Keep merged/split cells as-is 
+ 
+   DAY 4 STATUS 
+At this stage you already have: 
+   PyMuPDF text extraction 
+   pdfplumber table extraction 
+   page-wise extraction 
+   all tables detected 
+   all pages processed 
+Day 4 focuses ONLY on: 
+   generic table preservation 
+   dataframe reconstruction 
+   no data loss 
+`` 
+ 
+   FINAL TEMPLATE STRUCTURE 
+app/ 
+├── parser/ 
+│   ├── pymupdf_parser.py 
+│   ├── pdfplumber_table.py    
+│   ├── page_builder.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    
+│ 
+├── tests/ 
+│   ├── test_ingestion.py    
+ 
+   app/parser/pdfplumber_table.py 
+import pdfplumber 
+import pandas as pd 
+ 
+def extract_tables_pdf(pdf_path): 
+ 
+    tables = [] 
+ 
+    with pdfplumber.open(pdf_path) as pdf: 
+ 
+        for page_num, page in enumerate(pdf.pages): 
+ 
+            raw_tables = page.extract_tables() 
+ 
+            if not raw_tables: 
+                continue 
+ 
+            for table_id, table in enumerate(raw_tables): 
+ 
+                df = pd.DataFrame(table) 
+ 
+                #    remove fully empty rows 
+                df = df.dropna(axis=0, how="all") 
+ 
+                #    remove fully empty columns 
+                df = df.dropna(axis=1, how="all") 
+ 
+                #    preserve merged/split cells 
+                df = df.fillna(None) 
+ 
+                tables.append({ 
+                    "page": page_num, 
+                    "table_id": f"page_{page_num}table{table_id}" , 
+                    "df": df 
+                }) 
+ 
+                print(f"   Table extracted from page {page_num}") 
+ 
+    return tables 
+ 
+   app/parser/pymupdf_parser.py 
+import fitz 
+ 
+def parse_pymupdf(file_path): 
+ 
+    doc = fitz.open(file_path) 
+ 
+    pages = [] 
+ 
+    for i in range(doc.page_count): 
+ 
+        page = doc.load_page(i) 
+ 
+        text_lines = str( 
+            page.get_text("text") or "" 
+        ).splitlines() 
+ 
+        cleaned = [] 
+ 
+        for line in text_lines: 
+ 
+            line = line.strip() 
+ 
+            if line: 
+                cleaned.append(line) 
+ 
+        pages.append({ 
+            "page": i, 
+            "text": cleaned 
+        }) 
+ 
+    return pages 
+`` 
+ 
+   app/parser/page_builder.py 
+from app.parser.pymupdf_parser import parse_pymupdf 
+ 
+def build_page_view(file_path): 
+ 
+    parsed_pages = parse_pymupdf(file_path) 
+ 
+    final_pages = [] 
+ 
+    for p in parsed_pages: 
+ 
+        final_pages.append({ 
+            "page": p["page"], 
+            "text": p["text"] 
+        }) 
+ 
+    return final_pages 
+ 
+   app/ingestion/pipeline.py 
+from app.parser.page_builder import build_page_view 
+from app.parser.pdfplumber_table import extract_tables_pdf 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    tables = extract_tables_pdf(file_path) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": tables 
+    } 
+ 
+   tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+ 
+   WHAT DAY 4 ACHIEVES 
+   ALL pages extracted 
+   ALL tables preserved 
+   ALL columns preserved 
+   ALL rows preserved 
+   merged cells preserved 
+   split cells preserved 
+   generic extraction 
+   no hardcoding 
+   works for ANY PDF 
+ 
+   IMPORTANT DESIGN DECISION 
+Day 4 does NOT try to: 
+  interpret table meaning 
+  repair merged layouts 
+  infer headers 
+  force schema 
+Because that belongs to: 
+DAY 5 → semantic/schema layer 
+ 
+   CURRENT OUTPUT (CORRECT FOR DAY 4) 
+TABLE: page_0_table_1 
+ 
+P201 BRAKE TEMPERATURE MAPPING | CDT | GHD | HSD | None 
+ 
+Front pad peak temperature | Average | 104 | 104 | 82 
+Maximum                    | 163     | 179 | 188 | None 
+   This is GOOD extraction output. 
+   No data loss. 
+   Structure preserved. 
+   Ready for semantic interpretation later. 
+ 
+   YOU ARE NOW HERE 
+   DAY 4 COMPLETE 
+Next: 
+DAY 5 
+→ semantic schema layer 
+→ metadata 
+→ DuckDB 
+→ analytics-ready structure 
+ 
+
+--- END OF FILE: w1d4.pdf ---
+
+
+--- START OF FILE: w1d5.pdf ---
+
+        DAY 5 — GENERIC STRUCTURAL SEGMENTATION + SEMANTIC PROPAGATION 
+   GOAL 
+Move from: 
+hardcoded anchors   
+to: 
+layout intelligence    
+ 
+   DAY 5 ARCHITECTURE 
+RAW TABLE 
+   ↓ 
+Row profiling 
+   ↓ 
+Structural segmentation 
+   ↓ 
+Semantic propagation 
+   ↓ 
+Clean logical tables 
+`` 
+ 
+   WHAT DAY 5 SOLVES 
+   merged rows 
+   split cells 
+   logical table separation 
+   sparse engineering layouts 
+   side-by-side sections 
+   generic PDFs 
+   no anchors 
+   no hardcoding 
+`` 
+ 
+   YOUR TEMPLATE 
+app/ 
+├── parser/ 
+│   ├── pdfplumber_table.py 
+│   ├── table_segmenter.py    NEW 
+│   ├── semantic_propagator.py    NEW 
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+│ 
+├── tests/ 
+│   ├── test_ingestion.py 
+ 
+   STEP 1 — TABLE SEGMENTER 
+     app/parser/table_segmenter.py 
+import pandas as pd 
+ 
+def get_row_profile(row): 
+ 
+    values = [ 
+        str(x).strip() 
+        for x in row 
+    ] 
+ 
+    numeric_count = 0 
+    text_count = 0 
+    empty_count = 0 
+ 
+    for v in values: 
+ 
+        if v.lower() in ["" , "nan" , "none"]: 
+            empty_count += 1 
+ 
+        elif any(c.isdigit() for c in v): 
+            numeric_count += 1 
+ 
+        else: 
+            text_count += 1 
+ 
+    populated = len(values) - empty_count 
+ 
+    return { 
+        "numeric": numeric_count, 
+        "text": text_count, 
+        "empty": empty_count, 
+        "populated": populated 
+    } 
+ 
+   STEP 2 — GENERIC SEGMENTATION 
+def segment_dataframe(df): 
+ 
+    segments = [] 
+ 
+    current = [] 
+ 
+    previous_profile = None 
+ 
+    for _, row in df.iterrows(): 
+ 
+        row_values = list(row) 
+ 
+        profile = get_row_profile(row_values) 
+ 
+        #    detect structural discontinuity 
+        split_condition = False 
+ 
+        if previous_profile: 
+ 
+            diff = abs( 
+                profile["populated"] - 
+                previous_profile["populated"] 
+            ) 
+ 
+            #    sudden structure shift 
+            if diff >= 3: 
+                split_condition = True 
+ 
+        if split_condition and current: 
+ 
+            segments.append( 
+                pd.DataFrame(current) 
+            ) 
+ 
+            current = [] 
+ 
+        current.append(row_values) 
+ 
+        previous_profile = profile 
+ 
+    if current: 
+        segments.append( 
+            pd.DataFrame(current) 
+        ) 
+ 
+    return segments 
+ 
+   STEP 3 — SEMANTIC PROPAGATION 
+     app/parser/semantic_propagator.py 
+import pandas as pd 
+ 
+def propagate_semantic_rows(df): 
+ 
+    if len(df.columns) == 0: 
+        return df 
+ 
+    first_col = df.iloc[:, 0] 
+ 
+    propagated = [] 
+ 
+    previous_value = None 
+ 
+    for val in first_col: 
+ 
+        val_str = str(val).strip() 
+ 
+        #    semantic parent row 
+        if ( 
+            val_str.lower() not in 
+            ["" , "nan" , "none"] 
+        ): 
+ 
+            previous_value = val 
+ 
+            propagated.append(val) 
+ 
+        else: 
+ 
+            propagated.append(previous_value) 
+ 
+    df.iloc[:, 0] = propagated 
+ 
+    return df 
+ 
+   STEP 4 — MAIN NORMALIZER 
+     app/parser/table_normalizer.py 
+import pandas as pd 
+ 
+from app.parser.table_segmenter import ( 
+    segment_dataframe 
+) 
+ 
+from app.parser.semantic_propagator import ( 
+    propagate_semantic_rows 
+) 
+ 
+def normalize_tables(tables): 
+ 
+    final_tables = [] 
+ 
+    for t in tables: 
+ 
+        df = t["df"] 
+ 
+        #    clean only fully empty rows/cols 
+        df = df.dropna(axis=0, how="all") 
+        df = df.dropna(axis=1, how="all") 
+ 
+        #    preserve structure 
+        df = df.fillna(None) 
+ 
+        #    segment logically 
+        segments = segment_dataframe(df) 
+ 
+        for idx, seg in enumerate(segments): 
+ 
+            #    semantic propagation 
+            seg = propagate_semantic_rows(seg) 
+ 
+            final_tables.append({ 
+                "table_id": 
+                    f"{t['table_id']}segment{idx}" , 
+ 
+                "page": t["page"], 
+ 
+                "df": seg 
+            }) 
+ 
+    return final_tables 
+ 
+   STEP 5 — PIPELINE 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    tables = extract_tables_pdf(file_path) 
+ 
+    normalized_tables = normalize_tables( 
+        tables 
+    ) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": normalized_tables 
+    } 
+ 
+   STEP 6 — TEST 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+ 
+   WHAT THIS DAY 5 ACHIEVES 
+   generic segmentation 
+   structure-aware splitting 
+   semantic propagation 
+   no anchors 
+   no thermal hardcoding 
+   no table-name assumptions 
+   merged-row recovery 
+   sparse-layout handling 
+   works for engineering PDFs 
+ 
+   IMPORTANT SHIFT 
+You are no longer building: 
+table extractor 
+You are now building: 
+layout-aware document intelligence pipeline    
+ 
+   YOU ARE NOW HERE 
+   DAY 5 COMPLETE 
+`` 
+Next: 
+DAY 6 
+→ schema layer 
+→ metadata extraction 
+→ DuckDB 
+→ analytics-ready records 
+ 
+
+--- END OF FILE: w1d5.pdf ---
+
+
+--- START OF FILE: w1d6.pdf ---
+
+        DAY 6 — FINAL CLEAN GENERIC FILTERING LAYER (YOUR TEMPLATE) 
+   GOAL 
+Move from: 
+RAW extracted tables    
+to: 
+clean retrieval-ready tables    
+WITHOUT: 
+• hardcoding   
+• anchors   
+• thermal-specific logic   
+• modifying raw extraction   
+ 
+   WHAT DAY 6 DOES 
+   removes fully empty rows 
+   removes fully empty columns 
+   removes useless single-row tables 
+   removes useless single-column tables 
+   preserves all real data 
+   keeps extraction generic 
+   improves future LLM retrieval quality 
+ 
+   FINAL TEMPLATE STRUCTURE 
+app/ 
+├── parser/ 
+│   ├── pdfplumber_table.py 
+│   ├── table_segmenter.py 
+│   ├── semantic_propagator.py 
+│   ├── table_normalizer.py 
+│   ├── quality_scorer.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    
+│ 
+├── tests/ 
+│   ├── test_ingestion.py    
+ 
+   STEP 1 — quality_scorer.py 
+     app/parser/quality_scorer.py 
+import pandas as pd 
+ 
+def filter_useful_tables(tables): 
+ 
+    useful = [] 
+ 
+    for t in tables: 
+ 
+        df = t["df"].copy() 
+ 
+        #    normalize empty values 
+        df = df.map( 
+            lambda x: pd.NA 
+            if str(x).strip().lower() 
+            in ["nan" , "none" , ""] 
+            else x 
+        ) 
+ 
+        #    remove fully empty columns 
+        df = df.dropna(axis=1, how="all") 
+ 
+        #    remove fully empty rows 
+        df = df.dropna(axis=0, how="all") 
+ 
+        rows, cols = df.shape 
+ 
+        #    skip useless tiny tables 
+        if rows <= 1: 
+            continue 
+ 
+        if cols <= 1: 
+            continue 
+ 
+        #    update cleaned dataframe 
+        t["df"] = df 
+ 
+        useful.append(t) 
+ 
+    return useful 
+ 
+   STEP 2 — UPDATE pipeline.py 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+from app.parser.quality_scorer import ( 
+    filter_useful_tables 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    #    page text 
+    pages = build_page_view(file_path) 
+ 
+    #    raw table extraction 
+    raw_tables = extract_tables_pdf(file_path) 
+ 
+    #    structural normalization 
+    normalized_tables = normalize_tables( 
+        raw_tables 
+    ) 
+ 
+    #    final retrieval-ready filtering 
+    useful_tables = filter_useful_tables( 
+        normalized_tables 
+    ) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": useful_tables 
+    } 
+ 
+   STEP 3 — FINAL TEST FILE 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+for t in result["tables"]: 
+ 
+    print("\n====================") 
+    print("TABLE:" , t["table_id"]) 
+    print("PAGE:" , t["page"]) 
+ 
+    print(t["df"]) 
+`` 
+ 
+   WHAT THIS FINAL DAY 6 FIXES 
+   Before 
+0 1 2 3 4 5 6 7 8 
+NaN NaN NaN everywhere 
+tiny useless tables 
+ 
+   After 
+   only meaningful rows 
+   only meaningful columns 
+   all real data preserved 
+   cleaner dataframe 
+   retrieval-ready tables 
+ 
+   IMPORTANT DESIGN DECISION 
+Extraction Layer 
+preserve everything    
+`` 
+Filtering Layer 
+clean retrieval noise    
+`` 
+This separation is correct architecture. 
+ 
+   CURRENT PIPELINE (NOW GOOD) 
+PDF 
+↓ 
+PyMuPDF text extraction    
+↓ 
+pdfplumber table extraction    
+↓ 
+structural segmentation    
+↓ 
+semantic propagation    
+↓ 
+retrieval filtering    
+↓ 
+LLM-ready tables    
+ 
+   YOU ARE NOW HERE 
+   DAY 6 COMPLETE 
+Next: 
+DAY 7 
+→ embeddings 
+→ ChromaDB 
+→ semantic retrieval 
+→ RAG pipeline 
+ 
+
+--- END OF FILE: w1d6.pdf ---
+
+
+--- START OF FILE: w1d7.pdf ---
+
+        DAY 7 — EMBEDDINGS + CHROMADB + SEMANTIC RETRIEVAL 
+   GOAL 
+Move from: 
+clean tables    
+to: 
+semantic searchable engineering knowledge base    
+ 
+   DAY 7 ARCHITECTURE 
+PDF 
+↓ 
+Tables 
+↓ 
+Clean tables 
+↓ 
+Chunking 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Semantic Search 
+ 
+   WHAT DAY 7 ADDS 
+   embedding generation 
+   ChromaDB vector store 
+   chunk creation 
+   semantic retrieval 
+   similarity search 
+   engineering query search 
+   RAG foundation 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── embeddings/ 
+│   ├── embedder.py    
+│   ├── chunker.py    
+│   ├── vectordb.py    
+│ 
+├── query/ 
+│   ├── semantic_search.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+ 
+   STEP 1 — INSTALL 
+pip install chromadb sentence-transformers 
+ 
+   STEP 2 — CHUNKER 
+     app/embeddings/chunker.py 
+def dataframe_to_chunks(table): 
+ 
+    chunks = [] 
+ 
+    df = table["df"] 
+ 
+    page = table["page"] 
+ 
+    table_id = table["table_id"] 
+ 
+    for idx, row in df.iterrows(): 
+ 
+        values = [ 
+            str(v) 
+            for v in row.values 
+        ] 
+ 
+        text = " | " .join(values) 
+ 
+        chunks.append({ 
+            "id": f"{table_id}row{idx}" , 
+            "text": text, 
+            "metadata": { 
+                "page": page, 
+                "table_id": table_id 
+            } 
+        }) 
+ 
+    return chunks 
+ 
+   STEP 3 — EMBEDDER 
+     app/embeddings/embedder.py 
+from sentence_transformers import ( 
+    SentenceTransformer 
+) 
+ 
+model = SentenceTransformer( 
+    "all-MiniLM-L6-v2" 
+) 
+ 
+def create_embedding(text): 
+ 
+    return model.encode(text).tolist() 
+ 
+   STEP 4 — CHROMADB 
+     app/embeddings/vectordb.py 
+import chromadb 
+ 
+client = chromadb.PersistentClient( 
+    path=" ./chroma_db" 
+) 
+ 
+collection = client.get_or_create_collection( 
+    name="dvp_tables" 
+) 
+ 
+def store_chunks(chunks): 
+ 
+    ids = [] 
+    docs = [] 
+    metas = [] 
+ 
+    for chunk in chunks: 
+ 
+        ids.append(chunk["id"]) 
+ 
+        docs.append(chunk["text"]) 
+ 
+        metas.append(chunk["metadata"]) 
+ 
+    collection.add( 
+        ids=ids, 
+        documents=docs, 
+        metadatas=metas 
+    ) 
+ 
+   STEP 5 — SEMANTIC SEARCH 
+     app/query/semantic_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+def semantic_search(query, top_k=5): 
+ 
+    results = collection.query( 
+        query_texts=[query], 
+        n_results=top_k 
+    ) 
+ 
+    return results 
+ 
+   STEP 6 — UPDATE PIPELINE 
+     app/ingestion/pipeline.py 
+from app.parser.page_builder import ( 
+    build_page_view 
+) 
+ 
+from app.parser.pdfplumber_table import ( 
+    extract_tables_pdf 
+) 
+ 
+from app.parser.table_normalizer import ( 
+    normalize_tables 
+) 
+ 
+from app.parser.quality_scorer import ( 
+    filter_useful_tables 
+) 
+ 
+from app.embeddings.chunker import ( 
+    dataframe_to_chunks 
+) 
+ 
+from app.embeddings.vectordb import ( 
+    store_chunks 
+) 
+ 
+def process_pdf(file_path): 
+ 
+    pages = build_page_view(file_path) 
+ 
+    raw_tables = extract_tables_pdf( 
+        file_path 
+    ) 
+ 
+    normalized_tables = normalize_tables( 
+        raw_tables 
+    ) 
+ 
+    useful_tables = filter_useful_tables( 
+        normalized_tables 
+    ) 
+ 
+    all_chunks = [] 
+ 
+    for table in useful_tables: 
+ 
+        chunks = dataframe_to_chunks( 
+            table 
+        ) 
+ 
+        all_chunks.extend(chunks) 
+ 
+    store_chunks(all_chunks) 
+ 
+    return { 
+        "pages": pages, 
+        "tables": useful_tables, 
+        "chunks": all_chunks 
+    } 
+ 
+   STEP 7 — TEST INGESTION 
+     tests/test_ingestion.py 
+from app.ingestion.pipeline import process_pdf 
+ 
+result = process_pdf( 
+    r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE THERMAL 
+MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+) 
+ 
+print("\n   TOTAL CHUNKS:") 
+print(len(result["chunks"])) 
+ 
+   STEP 8 — TEST SEARCH 
+     tests/test_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+results = semantic_search( 
+    "maximum front pad temperature" 
+) 
+ 
+print(results) 
+ 
+   EXPECTED RESULT 
+Front pad peak temperature | Maximum | 163 | 179 | 188 
+retrieved semantically    
+ 
+   WHAT DAY 7 ACHIEVES 
+   engineering semantic search 
+   vector database 
+   embeddings 
+   retrieval layer 
+   RAG foundation 
+   scalable architecture 
+ 
+   YOUR SYSTEM NOW 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Chunking 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Semantic Search    
+`` 
+ 
+   YOU ARE NOW HERE 
+   DAY 7 COMPLETE 
+Next: 
+DAY 8 
+→ Hybrid Search 
+→ BM25 + Vector 
+→ Metadata Filtering 
+→ Better engineering retrieval 
+ 
+
+--- END OF FILE: w1d7.pdf ---
+
+
+--- START OF FILE: w2d10.pdf ---
+
+        DAY 10 — DUCKDB + STRUCTURED ANALYTICS + ENGINEERING QUERY ENGINE 
+   GOAL 
+Move from: 
+RAG search    
+to: 
+structured engineering analytics    
+ 
+   WHY DAY 10 IS IMPORTANT 
+Current system: 
+LLM retrieval works    
+BUT: 
+LLM is weak for exact calculations   
+aggregations   
+comparisons   
+engineering analytics   
+Example: 
+Which condition has highest brake temperature? 
+Average CDT across reports? 
+Compare GHD vs HSD? 
+LLM alone is unreliable. 
+ 
+   DAY 10 FIXES 
+   DuckDB structured storage 
+   SQL querying 
+   engineering analytics 
+   exact numeric calculations 
+   metadata-aware filtering 
+   hybrid RAG + SQL 
+ 
+   DAY 10 ARCHITECTURE 
+PDF 
+↓ 
+Extraction 
+↓ 
+Tables 
+↓ 
+Chunks 
+↓ 
+ChromaDB    semantic 
+ 
+AND 
+ 
+↓ 
+Structured Records 
+↓ 
+DuckDB    analytics 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── storage/ 
+│   ├── duckdb_store.py    
+│ 
+├── analytics/ 
+│   ├── analytics_engine.py    
+│ 
+├── query/ 
+│   ├── sql_query.py    
+│ 
+├── ingestion/ 
+│   ├── pipeline.py    MODIFY 
+ 
+   STEP 1 — INSTALL 
+pip install duckdb 
+ 
+   STEP 2 — DUCKDB STORAGE 
+     app/storage/duckdb_store.py 
+import duckdb 
+ 
+conn = duckdb.connect( 
+    "engineering.db" 
+) 
+ 
+def initialize_db(): 
+ 
+    conn.execute(""" 
+    CREATE TABLE IF NOT EXISTS engineering_chunks ( 
+ 
+        chunk_id TEXT, 
+        page INTEGER, 
+        table_id TEXT, 
+        content TEXT 
+    ) 
+    """) 
+ 
+def insert_chunks(chunks): 
+ 
+    for chunk in chunks: 
+ 
+        conn.execute(""" 
+        INSERT INTO engineering_chunks 
+        VALUES (?, ?, ?, ?) 
+        """ , ( 
+ 
+            chunk["id"], 
+ 
+            chunk["metadata"]["page"], 
+ 
+            chunk["metadata"]["table_id"], 
+ 
+            chunk["text"] 
+        )) 
+ 
+   STEP 3 — STORE INTO DUCKDB 
+     app/ingestion/pipeline.py 
+Add: 
+from app.storage.duckdb_store import ( 
+    initialize_db, 
+    insert_chunks 
+) 
+ 
+Add before return: 
+initialize_db() 
+ 
+insert_chunks(all_chunks) 
+ 
+   STEP 4 — SQL QUERY ENGINE 
+     app/query/sql_query.py 
+from app.storage.duckdb_store import ( 
+    conn 
+) 
+ 
+def run_sql(query): 
+ 
+    result = conn.execute(query) 
+ 
+    return result.fetchall() 
+ 
+   STEP 5 — ANALYTICS ENGINE 
+     app/analytics/analytics_engine.py 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+def get_temperature_rows(): 
+ 
+    query = """ 
+    SELECT * 
+    FROM engineering_chunks 
+    WHERE LOWER(content) 
+    LIKE '%temperature%' 
+    """ 
+ 
+    return run_sql(query) 
+ 
+   STEP 6 — TEST SQL 
+     tests/test_sql.py 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+result = run_sql(""" 
+ 
+SELECT * 
+FROM engineering_chunks 
+LIMIT 10 
+ 
+""") 
+ 
+print(result) 
+ 
+   STEP 7 — TEST ANALYTICS 
+     tests/test_analytics.py 
+from app.analytics.analytics_engine import ( 
+    get_temperature_rows 
+) 
+ 
+results = get_temperature_rows() 
+ 
+for r in results: 
+ 
+    print(r) 
+ 
+   WHAT DAY 10 ACHIEVES 
+   exact SQL filtering 
+   engineering analytics 
+   numeric querying 
+   scalable storage 
+   metadata filtering 
+   hybrid SQL + RAG 
+ 
+   HUGE ARCHITECTURE SHIFT 
+Before: 
+LLM-only retrieval 
+Now: 
+Semantic AI    
++ 
+Structured Analytics    
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings → ChromaDB    
+ 
+AND 
+ 
+↓ 
+Structured Storage → DuckDB    
+ 
+   EXAMPLE FUTURE QUERIES 
+SELECT * 
+FROM engineering_chunks 
+WHERE content LIKE '%Maximum%' 
+ 
+SELECT COUNT(*) 
+FROM engineering_chunks 
+ 
+SELECT * 
+FROM engineering_chunks 
+WHERE page = 6 
+ 
+   WHY THIS IS POWERFUL 
+Now your system supports: 
+   semantic retrieval 
+   exact retrieval 
+   analytics 
+   engineering computations 
+   reporting 
+   dashboarding 
+ 
+   YOU ARE NOW HERE 
+   DAY 10 COMPLETE 
+Next: 
+DAY 11 
+→ LangGraph agent 
+→ tool calling 
+→ SQL + RAG orchestration 
+→ engineering copilot workflows 
+ 
+
+--- END OF FILE: w2d10.pdf ---
+
+
+--- START OF FILE: w2d11.pdf ---
+
+        DAY 11 — LANGGRAPH AGENT + TOOL CALLING + SQL/RAG ORCHESTRATION 
+   GOAL 
+Move from: 
+manual retrieval    
+to: 
+AI engineering copilot    
+`` 
+that can: 
+   decide when to use RAG 
+   decide when to use SQL 
+   combine both 
+   answer engineering questions intelligently 
+ 
+   DAY 11 ARCHITECTURE 
+User Question 
+     ↓ 
+LangGraph Agent    
+     ↓ 
+Tool Selection 
+ 
+┌───────────────┬───────────────┐ 
+│               │               │ 
+RAG Search    SQL Search     Hybrid 
+│               │               │ 
+└───────────────┴───────────────┘ 
+         ↓ 
+Context Assembly 
+         ↓ 
+Qwen2.5 
+         ↓ 
+Final Engineering Answer 
+ 
+   WHAT DAY 11 ADDS 
+   LangGraph agent 
+   tool calling 
+   query routing 
+   SQL orchestration 
+   RAG orchestration 
+   engineering copilot workflow 
+   intelligent retrieval selection 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── agent/ 
+│   ├── tools.py    
+│   ├── router.py    
+│   ├── graph.py    
+│   ├── ask.py    
+`` 
+ 
+   STEP 1 — INSTALL 
+pip install langgraph langchain 
+ 
+   STEP 2 — CREATE TOOLS 
+     app/agent/tools.py 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+from app.query.structured_search import ( 
+    structured_search 
+) 
+ 
+def rag_tool(query): 
+ 
+    results = hybrid_search(query) 
+ 
+    return { 
+        "tool": "rag" , 
+        "results": results 
+    } 
+ 
+def sql_tool(query): 
+ 
+    results = structured_search( 
+        keyword=query 
+    ) 
+ 
+    return { 
+        "tool": "sql" , 
+        "results": results 
+    } 
+ 
+   STEP 3 — QUERY ROUTER 
+     app/agent/router.py 
+def route_query(query): 
+ 
+    query = query.lower() 
+ 
+    sql_keywords = [ 
+ 
+        "count" , 
+        "maximum" , 
+        "minimum" , 
+        "average" , 
+        "compare" , 
+        "page" 
+ 
+    ] 
+ 
+    for k in sql_keywords: 
+ 
+        if k in query: 
+            return "sql" 
+ 
+    return "rag" 
+ 
+   STEP 4 — LANGGRAPH WORKFLOW 
+     app/agent/graph.py 
+from app.agent.router import ( 
+    route_query 
+) 
+ 
+from app.agent.tools import ( 
+    rag_tool, 
+    sql_tool 
+) 
+ 
+def run_agent(query): 
+ 
+    route = route_query(query) 
+ 
+    if route == "sql": 
+ 
+        return sql_tool(query) 
+ 
+    return rag_tool(query) 
+ 
+   STEP 5 — FINAL AGENT 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+def ask_question(query): 
+ 
+    tool_output = run_agent(query) 
+ 
+    context = "" 
+ 
+    #    RAG context 
+    if tool_output["tool"] == "rag": 
+ 
+        for r in tool_output["results"]: 
+ 
+            context += ( 
+                r["document"] + "\n" 
+            ) 
+ 
+    #    SQL context 
+    else: 
+ 
+        for r in tool_output["results"]: 
+ 
+            context += ( 
+                str(r) + "\n" 
+            ) 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering assistant. 
+ 
+Use ONLY the provided context. 
+ 
+Context: 
+{context} 
+ 
+Question: 
+{query} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 6 — TEST AGENT 
+     main.py 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+while True: 
+ 
+    query = input("\nAsk: ") 
+ 
+    if query.lower() == "exit": 
+        break 
+ 
+    response = ask_question(query) 
+ 
+    print("\n=== RESPONSE ===\n") 
+ 
+    print(response) 
+ 
+ 
+   EXAMPLE FLOW 
+ 
+Query 1 
+What is front pad maximum temperature? 
+Agent decides: 
+   RAG search 
+because semantic retrieval better. 
+ 
+Query 2 
+Count all temperature rows 
+Agent decides: 
+   SQL search 
+because structured analytics better. 
+ 
+   WHY DAY 11 IS BIG 
+Before: 
+manual pipelines 
+Now: 
+AI decides retrieval strategy    
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+ChromaDB    
+↓ 
+DuckDB    
+↓ 
+LangGraph Agent    
+↓ 
+Qwen2.5    
+ 
+   YOU NOW HAVE 
+   local engineering copilot 
+   hybrid retrieval agent 
+   semantic + SQL orchestration 
+   tool-calling workflow 
+   enterprise-style RAG architecture 
+ 
+   YOU ARE NOW HERE 
+   DAY 11 COMPLETE 
+Next: 
+DAY 12 
+→ conversational memory 
+→ multi-step reasoning 
+→ engineering workflows 
+→ report summarization 
+→ recommendation engine 
+ 
+
+--- END OF FILE: w2d11.pdf ---
+
+
+--- START OF FILE: w2d12.pdf ---
+
+        DAY 12 — CONVERSATION MEMORY + QUERY REWRITER + MULTI-TURN ENGINEERING COPILOT 
+   GOAL 
+Move from: 
+single-turn QA    
+to: 
+multi-turn engineering copilot    
+that supports: 
+   follow-up questions 
+   conversational memory 
+   contextual retrieval 
+   engineering discussion continuity 
+   report summarization 
+   conversational RAG 
+ 
+   WHY DAY 12 IS IMPORTANT 
+Current system: 
+Q1 → retrieve → answer 
+BUT follow-up questions fail: 
+Q1: What is front pad maximum temperature? 
+Q2: Compare with rear liner temperature. 
+because retrieval only sees: 
+Compare with rear liner temperature 
+without previous context. 
+ 
+   DAY 12 FIXES 
+   session memory 
+   query rewriting 
+   context-aware retrieval 
+   multi-turn reasoning 
+   engineering workflow continuity 
+ 
+   DAY 12 ARCHITECTURE 
+User Question 
+      ↓ 
+Conversation Memory    
+      ↓ 
+Query Rewriter    
+      ↓ 
+Router    
+      ↓ 
+RAG / SQL Retrieval    
+      ↓ 
+Context Builder    
+      ↓ 
+Qwen2.5    
+      ↓ 
+Store Conversation    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── memory/ 
+│   ├── session_memory.py    
+│   ├── query_rewriter.py    
+│ 
+├── agent/ 
+│   ├── ask.py    MODIFY 
+│ 
+├── summarizer/ 
+│   ├── report_summary.py    
+│ 
+├── tests/ 
+│   ├── test_summary.py    
+ 
+   STEP 1 — SESSION MEMORY 
+     app/memory/session_memory.py 
+conversation_history = [] 
+ 
+def add_message(role, content): 
+ 
+    conversation_history.append({ 
+        "role": role, 
+        "content": content 
+    }) 
+ 
+def get_history(): 
+ 
+    return conversation_history 
+ 
+def clear_history(): 
+ 
+    conversation_history.clear() 
+ 
+   STEP 2 — QUERY REWRITER 
+     app/memory/query_rewriter.py 
+from app.memory.session_memory import ( 
+    get_history 
+) 
+ 
+def rewrite_query(current_query): 
+ 
+    history = get_history() 
+ 
+    #    previous user queries 
+    previous_queries = [ 
+ 
+        h["content"] 
+ 
+        for h in history 
+ 
+        if h["role"] == "user" 
+    ] 
+ 
+    #    no history 
+    if not previous_queries: 
+ 
+        return current_query 
+ 
+    previous_query = previous_queries[-1] 
+ 
+    #    avoid duplicate expansion 
+    if current_query.lower() in previous_query.lower(): 
+ 
+        return current_query 
+ 
+    #    contextual rewrite 
+    rewritten = ( 
+        previous_query 
+        + " " 
+        + current_query 
+    ) 
+ 
+    return rewritten 
+ 
+   STEP 3 — MODIFY ask.py 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+from app.memory.session_memory import ( 
+    add_message 
+) 
+ 
+from app.memory.query_rewriter import ( 
+    rewrite_query 
+) 
+ 
+def ask_question(query): 
+ 
+    #    store user query 
+    add_message( 
+        "user" , 
+        query 
+    ) 
+ 
+    #    rewrite using conversation 
+    enhanced_query = rewrite_query( 
+        query 
+    ) 
+ 
+    #    retrieval 
+    tool_output = run_agent( 
+        enhanced_query 
+    ) 
+ 
+    context = "" 
+ 
+    for r in tool_output["results"]: 
+ 
+        if isinstance(r, dict): 
+ 
+            context += ( 
+                str( 
+                    r.get("document" , "") 
+                ) 
+                + "\n" 
+            ) 
+ 
+        else: 
+ 
+            context += ( 
+                str(r) 
+                + "\n" 
+            ) 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering assistant. 
+ 
+Answer ONLY from the provided context. 
+ 
+If answer is unavailable say: 
+"Answer not found in context. " 
+ 
+==================== 
+CONTEXT 
+==================== 
+ 
+{context} 
+ 
+==================== 
+QUESTION 
+==================== 
+ 
+{query} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    answer = response["message"]["content"] 
+ 
+    #    store assistant response 
+    add_message( 
+        "assistant" , 
+        answer 
+    ) 
+ 
+    return answer 
+ 
+   STEP 4 — REPORT SUMMARIZER 
+     app/summarizer/report_summary.py 
+import ollama 
+ 
+from app.query.sql_query import ( 
+    run_sql 
+) 
+ 
+def summarize_report(): 
+ 
+    rows = run_sql(""" 
+ 
+    SELECT content 
+    FROM engineering_chunks 
+    LIMIT 100 
+ 
+    """) 
+ 
+    combined = "\n" .join( 
+        r[0] 
+        for r in rows 
+    ) 
+ 
+    prompt = f""" 
+ 
+Summarize this automotive engineering report. 
+ 
+Focus on: 
+- brake system 
+- temperatures 
+- key observations 
+- important values 
+- testing conditions 
+ 
+Report Content: 
+{combined} 
+ 
+""" 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 5 — UPDATE main.py 
+     main.py 
+import os 
+ 
+from app.ingestion.pipeline import ( 
+    process_pdf 
+) 
+ 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+from app.memory.session_memory import ( 
+    clear_history 
+) 
+ 
+from app.summarizer.report_summary import ( 
+    summarize_report 
+) 
+ 
+PDF_PATH = r"D:\new_train\training\Pdf_praser_llm\data\0183-VP-TDM-06-08196-C006-1339-BRAKE 
+THERMAL MAPPING CITY CONDITION Vehicle Dynamics.pdf" 
+ 
+#    ingest once 
+if not os.path.exists("chroma_db"): 
+ 
+    print("\n   First-time ingestion started...\n") 
+ 
+    process_pdf(PDF_PATH) 
+ 
+    print("\n   Ingestion completed.\n") 
+ 
+else: 
+ 
+    print("\n   Existing DB found. Skipping ingestion.\n") 
+ 
+#    chat loop 
+while True: 
+ 
+    query = input("\nAsk: ") 
+ 
+    if query.lower() == "exit": 
+        break 
+ 
+    #    clear memory 
+    if query.lower() == "clear": 
+ 
+        clear_history() 
+ 
+        print("\n   Memory cleared.\n") 
+ 
+        continue 
+ 
+    #    summarize report 
+    if query.lower() == "summary": 
+ 
+        summary = summarize_report() 
+ 
+        print("\n=== SUMMARY ===\n") 
+ 
+        print(summary) 
+ 
+        continue 
+ 
+    response = ask_question(query) 
+ 
+    print("\n=== RESPONSE ===\n") 
+ 
+    print(response) 
+ 
+   EXAMPLE MULTI-TURN FLOW 
+ 
+USER 
+What is front pad maximum temperature? 
+ 
+ASSISTANT 
+163, 179, 188 deg C 
+ 
+USER 
+Compare with rear liner temperature 
+ 
+INTERNAL QUERY REWRITE 
+What is front pad maximum temperature? 
+Compare with rear liner temperature 
+ 
+ASSISTANT 
+Front pad maximum temperatures: 
+163, 179, 188 deg C 
+ 
+Rear liner maximum temperatures: 
+153, 153, 146 deg C 
+ 
+   WHAT DAY 12 ACHIEVES 
+   conversational memory 
+   follow-up reasoning 
+   contextual retrieval 
+   engineering dialogue 
+   report summarization 
+   multi-turn RAG 
+   query rewriting 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+DuckDB 
+↓ 
+Hybrid Retrieval 
+↓ 
+Agent Routing 
+↓ 
+Conversation Memory    
+↓ 
+Query Rewriter    
+↓ 
+Qwen2.5    
+ 
+   YOU ARE NOW HERE 
+   DAY 12 COMPLETE 
+Next: 
+DAY 13 
+→ engineering workflow agents 
+→ anomaly detection 
+→ recommendation engine 
+→ comparative analysis 
+→ autonomous report insights 
+ 
+
+--- END OF FILE: w2d12.pdf ---
+
+
+--- START OF FILE: w2d13.pdf ---
+
+        DAY 13 — GENERIC REASONING + TOOL ORCHESTRATION + CONTEXT INTELLIGENCE 
+   GOAL 
+Move from: 
+retrieval + memory    
+to: 
+generic engineering intelligence system    
+WITHOUT: 
+• hardcoded thresholds   
+• metric-specific logic   
+• temperature rules   
+• domain assumptions   
+ 
+   CORE IDEA OF NEW DAY 13 
+Python should NOT do engineering reasoning. 
+Instead: 
+Python → orchestration    
+LLM → reasoning    
+ 
+   WHAT DAY 13 ADDS 
+   structured context intelligence 
+   dynamic reasoning prompts 
+   tool orchestration 
+   generic engineering analysis 
+   context compression 
+   deduplication 
+   insight generation 
+   recommendation generation 
+WITHOUT hardcoding. 
+ 
+   DAY 13 ARCHITECTURE 
+User Query 
+      ↓ 
+Conversation Memory    
+      ↓ 
+QueryRetriever   Query Rewriter    
+      ↓ 
+Context Deduplicator    
+      ↓ 
+Structured Context Builder    
+      ↓ 
+Reasoning Prompt Generator    
+      ↓ 
+Qwen2.5    
+      ↓ 
+ 
+   IMPORTANT SHIFT 
+OLD DAY 13: 
+Python decides anomaly   
+NEW DAY 13: 
+LLM infers anomaly    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── context/ 
+│   ├── context_builder.py    
+│   ├── context_deduplicator.py    
+│   ├── reasoning_prompt.py    
+│ 
+├── agent/ 
+│   ├── ask.py    MODIFY 
+ 
+   STEP 1 — CONTEXT DEDUPLICATOR 
+     app/context/context_deduplicator.py 
+def deduplicate_context(results): 
+ 
+    unique = [] 
+ 
+    seen = set() 
+ 
+    for r in results: 
+ 
+        if isinstance(r, dict): 
+ 
+            text = str( 
+                r.get("document" , "") 
+            ).strip() 
+ 
+        else: 
+ 
+            text = str(r).strip() 
+ 
+        #    skip duplicates 
+        if text in seen: 
+            continue 
+ 
+        seen.add(text) 
+ 
+        unique.append(text) 
+ 
+    return unique 
+ 
+   STEP 2 — STRUCTURED CONTEXT BUILDER 
+     app/context/context_builder.py 
+def build_structured_context(chunks): 
+ 
+    sections = [] 
+ 
+    for idx, chunk in enumerate(chunks): 
+ 
+        block = f""" 
+ 
+[Context {idx+1}] 
+ 
+{chunk} 
+ 
+""" 
+ 
+        sections.append(block) 
+ 
+    return "\n" .join(sections) 
+ 
+   STEP 3 — REASONING PROMPT GENERATOR 
+     app/context/reasoning_prompt.py 
+def build_reasoning_prompt( 
+ 
+    query, 
+    context 
+ 
+): 
+ 
+    prompt = f""" 
+ 
+You are an automotive engineering copilot. 
+ 
+Use ONLY the provided context. 
+ 
+Perform: 
+- engineering reasoning 
+- comparisons 
+- observations 
+- trend analysis 
+- recommendations 
+ 
+DO NOT use external knowledge. 
+ 
+If information is unavailable, 
+say: 
+"Answer not found in context. " 
+ 
+==================== 
+ENGINEERING CONTEXT 
+==================== 
+ 
+{context} 
+ 
+==================== 
+QUESTION 
+==================== 
+ 
+{query} 
+ 
+==================== 
+RESPONSE FORMAT 
+==================== 
+ 
+1. Direct Answer 
+2. Engineering Observations 
+3. Comparative Insights 
+4. Recommendations 
+ 
+""" 
+ 
+    return prompt 
+`` 
+ 
+   STEP 4 — MODIFY ask.py 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.agent.graph import ( 
+    run_agent 
+) 
+ 
+from app.memory.session_memory import ( 
+    add_message 
+) 
+ 
+from app.memory.query_rewriter import ( 
+    rewrite_query 
+) 
+ 
+from app.context.context_deduplicator import ( 
+    deduplicate_context 
+) 
+ 
+from app.context.context_builder import ( 
+    build_structured_context 
+) 
+ 
+from app.context.reasoning_prompt import ( 
+    build_reasoning_prompt 
+) 
+ 
+def ask_question(query): 
+ 
+    #    store query 
+    add_message( 
+        "user" , 
+        query 
+    ) 
+ 
+    #    rewrite using memory 
+    enhanced_query = rewrite_query( 
+        query 
+    ) 
+ 
+    #    retrieval 
+    tool_output = run_agent( 
+        enhanced_query 
+    ) 
+ 
+    #    deduplicate 
+    cleaned_chunks = deduplicate_context( 
+        tool_output["results"] 
+    ) 
+ 
+    #    structured context 
+    context = build_structured_context( 
+        cleaned_chunks 
+    ) 
+ 
+    #    reasoning prompt 
+    prompt = build_reasoning_prompt( 
+        query, 
+        context 
+    ) 
+ 
+    response = ollama.chat( 
+ 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    answer = response["message"]["content"] 
+ 
+    #    save response 
+    add_message( 
+        "assistant" , 
+        answer 
+    ) 
+ 
+    return answer 
+ 
+   WHAT THIS NEW DAY 13 DOES 
+Instead of: 
+if value > threshold 
+you now do: 
+LLM-based reasoning    
+using: 
+• retrieved context 
+• comparisons 
+• observations 
+• engineering interpretation 
+ 
+   EXAMPLE 
+USER 
+Compare front pad and rear liner temperature 
+ 
+CONTEXT SENT TO QWEN 
+Front pad: 
+163 | 179 | 188 
+ 
+Rear liner: 
+153 | 153 | 146 
+ 
+QWEN REASONS 
+Front pad temperatures are consistently higher. 
+ 
+Possible braking system.Possible higher thermal loading observed 
+ 
+Review brake balance and cooling performance. 
+   NO hardcoded rules 
+   Generic reasoning 
+   Works for any engineering metric 
+ 
+   WHY THIS IS BETTER 
+This architecture is now: 
+   generic 
+   scalable 
+   multi-domain 
+   future-proof 
+   LLM-native 
+   retrieval-grounded 
+`` 
+instead of: 
+temperature-specific Python rules   
+ 
+   IMPORTANT DESIGN PRINCIPLE 
+   Python Responsibilities 
+   retrieval 
+   orchestration 
+   memory 
+   chunking 
+   storage 
+   context building 
+   tool execution 
+ 
+   LLM Responsibilities 
+   engineering reasoning 
+   comparisons 
+   observations 
+   recommendations 
+   interpretation 
+   analysis 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+DuckDB 
+↓ 
+Hybrid Retrieval 
+↓ 
+Conversation Memory 
+↓ 
+Query Rewriter 
+↓ 
+Context Intelligence    
+↓ 
+LLM Reasoning    
+↓ 
+Engineering Copilot    
+ 
+   YOU ARE NOW HERE 
+   DAY 13 COMPLETE 
+Next: 
+DAY 14 
+→ autonomous engineering workflows 
+→ multi-document reasoning 
+→ report comparison 
+→ dynamic tool planning 
+→ engineering dashboard 
+ 
+
+--- END OF FILE: w2d13.pdf ---
+
+
+--- START OF FILE: w2d14.pdf ---
+
+        DAY 14 — TABLE-NEIGHBORHOOD RETRIEVAL + CONTEXT EXPANSION 
+   GOAL 
+Move from: 
+row-level retrieval   
+to: 
+table-aware retrieval    
+so engineering relationships stay intact. 
+ 
+   WHAT DAY 14 FIXES 
+   average/max comparison 
+   front/rear comparison 
+   CDT/GHD/HSD understanding 
+   multi-row engineering reasoning 
+   weak isolated chunk retrieval 
+   incomplete context 
+ 
+   CORE IDEA 
+If one row is retrieved: 
+Front pad peak temp | Average 
+automatically retrieve: 
+neighbor rows 
+from same table 
+ 
+   NEW ARCHITECTURE 
+Semantic Retrieval 
+      ↓ 
+Neighbor Expansion    
+      ↓ 
+Deduplication    
+      ↓ 
+Structured Context    
+      ↓ 
+Qwen2.5    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── retrieval/ 
+│   ├── neighbor_retriever.py    
+│ 
+├── agent/ 
+│   ├── ask.py    MODIFY 
+ 
+   STEP 1 — CREATE NEIGHBOR RETRIEVER 
+     app/retrieval/neighbor_retriever.py 
+from app.storage.duckdb_store import ( 
+    conn 
+) 
+ 
+def get_neighbor_chunks( 
+ 
+    table_id, 
+    row_index, 
+    window=2 
+ 
+): 
+ 
+    min_row = max(0, row_index - window) 
+ 
+    max_row = row_index + window 
+ 
+    query = f""" 
+ 
+    SELECT content 
+    FROM engineering_chunks 
+ 
+    WHERE table_id = '{table_id}' 
+ 
+    AND CAST( 
+ 
+        regexp_extract( 
+            chunk_id, 
+            'row_(\d+)' , 
+            1 
+ 
+        ) AS INTEGER 
+ 
+    ) 
+ 
+    BETWEEN {min_row} AND {max_row} 
+ 
+    """ 
+ 
+    rows = conn.execute(query).fetchall() 
+ 
+    return [r[0] for r in rows] 
+ 
+   STEP 2 — MODIFY hybrid_search.py 
+     app/query/hybrid_search.py 
+Add import: 
+from app.retrieval.neighbor_retriever import ( 
+    get_neighbor_chunks 
+) 
+ 
+   ADD AFTER RERANKING 
+Replace: 
+return list(reranked[:5]) 
+WITH: 
+expanded_results = [] 
+ 
+for r in reranked[:5]: 
+ 
+    expanded_results.append(r) 
+ 
+    metadata = r["metadata"] 
+ 
+    table_id = metadata["table_id"] 
+ 
+    row_index = metadata.get( 
+        "row_index" , 
+        0 
+    ) 
+ 
+    neighbors = get_neighbor_chunks( 
+ 
+        table_id=table_id, 
+        row_index=row_index, 
+        window=2 
+ 
+    ) 
+ 
+    for n in neighbors: 
+ 
+        expanded_results.append({ 
+            "document": n, 
+            "metadata": metadata, 
+            "source": "neighbor" 
+        }) 
+ 
+return expanded_results 
+ 
+   STEP 3 — ENSURE ROW INDEX EXISTS 
+     app/embeddings/chunker.py 
+Make sure metadata contains: 
+"row_index": idx 
+ 
+   FINAL CHUNK FORMAT 
+chunks.append({ 
+ 
+    "id": f"{table_id}row{idx}" , 
+ 
+    "text": text, 
+ 
+    "metadata": { 
+ 
+        "page": page, 
+ 
+        "table_id": table_id, 
+ 
+        "row_index": idx, 
+ 
+        "source": "table" 
+    } 
+}) 
+ 
+   STEP 4 — DEDUPLICATION STILL USED 
+Your existing: 
+     context_deduplicator.py 
+already works. 
+No change needed    
+ 
+   STEP 5 — RUN 
+python main.py 
+ 
+   NOW TEST 
+Compare front pad and rear liner peak temperature at average 
+ 
+   BEFORE DAY 14 
+Retriever got only: 
+Front pad | Average 
+  incomplete context 
+ 
+   AFTER DAY 14 
+Retriever automatically expands: 
+Front pad | Average 
+Front pad | Maximum 
+Rear liner | Average 
+Rear liner | Maximum 
+   complete engineering neighborhood 
+ 
+   EXPECTED RESPONSE 
+Front pad average temperatures: 
+104 | 104 | 82 
+ 
+Rear liner average temperatures: 
+94 | 98 | 72 
+ 
+Observation: 
+Front pad temperatures are consistently higher. 
+ 
+Possible higher thermal loading observed 
+in front braking system. 
+ 
+   WHY THIS IS THE CORRECT SOLUTION 
+Engineering meaning exists in: 
+table structure    
+NOT isolated rows. 
+ 
+   IMPORTANT 
+This is: 
+   generic 
+   layout-aware 
+   no hardcoding 
+   works for any engineering table 
+   retrieval-native 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Hybrid Retrieval 
+↓ 
+Neighbor Expansion    
+↓ 
+Deduplication    
+↓ 
+Context Intelligence    
+↓ 
+Qwen2.5    
+ 
+   YOU ARE NOW HERE 
+   DAY 14 COMPLETE 
+Next: 
+DAY 15 
+→ multi-document reasoning 
+→ report comparison 
+→ cross-PDF retrieval 
+→ engineering workflow planning 
+→ autonomous tool selection 
+ 
+
+--- END OF FILE: w2d14.pdf ---
+
+
+--- START OF FILE: w2d8.pdf ---
+
+        DAY 8 — HYBRID RETRIEVAL + METADATA SEARCH 
+   GOAL 
+Move from: 
+semantic vector search only    
+to: 
+hybrid engineering retrieval    
+ 
+   DAY 8 ARCHITECTURE 
+User Query 
+   ↓ 
+Vector Search (BM25-like)Vector Search (semantic) 
+   + 
+Metadata Filtering 
+   ↓ 
+Combined Ranked Results 
+ 
+   + 
+ 
+   WHAT DAY 8 ADDS 
+   metadata-aware retrieval 
+   keyword search 
+   hybrid retrieval 
+   better engineering queries 
+   page filtering 
+   table filtering 
+   exact metric retrieval 
+   semantic + exact matching 
+ 
+   WHY DAY 8 IS IMPORTANT 
+Current Day 7: 
+semantic similarity only 
+Problem: 
+"Front pad max temp" 
+may retrieve: 
+rear liner temp   
+because embeddings are semantically close. 
+ 
+   Day 8 Fixes This 
+Combines: 
+semantic meaning    
++ 
+exact engineering terms    
+`` 
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── query/ 
+│   ├── semantic_search.py 
+│   ├── keyword_search.py    NEW 
+│   ├── hybrid_search.py    NEW 
+│ 
+├── embeddings/ 
+│   ├── metadata_builder.py    NEW 
+ 
+   STEP 1 — ADD METADATA TO CHUNKS 
+     app/embeddings/chunker.py 
+Update: 
+chunks.append({ 
+    "id": f"{table_id}row{idx}" , 
+    "text": text, 
+    "metadata": { 
+        "page": page, 
+        "table_id": table_id 
+    } 
+}) 
+ 
+   TO 
+chunks.append({ 
+    "id": f"{table_id}row{idx}" , 
+    "text": text, 
+ 
+    "metadata": { 
+        "page": page, 
+        "table_id": table_id, 
+ 
+        #    searchable metadata 
+        "row_index": idx, 
+        "source": "table" 
+    } 
+}) 
+ 
+   STEP 2 — KEYWORD SEARCH 
+     app/query/keyword_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+def keyword_search(keyword): 
+ 
+    data = collection.get() 
+ 
+    results = [] 
+ 
+    docs = data["documents"] 
+    metas = data["metadatas"] 
+ 
+    for doc, meta in zip(docs, metas): 
+ 
+        if keyword.lower() in doc.lower(): 
+ 
+            results.append({ 
+                "document": doc, 
+                "metadata": meta 
+            }) 
+ 
+    return results 
+ 
+   STEP 3 — HYBRID SEARCH 
+     app/query/hybrid_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+from app.query.keyword_search import ( 
+    keyword_search 
+) 
+ 
+def hybrid_search(query): 
+ 
+    semantic = semantic_search( 
+        query, 
+        top_k=5 
+    ) 
+ 
+    keyword = keyword_search( 
+        query 
+    ) 
+ 
+    return { 
+        "semantic_results": semantic, 
+        "keyword_results": keyword 
+    } 
+ 
+   STEP 4 — TEST HYBRID SEARCH 
+     tests/test_hybrid_search.py 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+results = hybrid_search( 
+    "front pad maximum temperature" 
+) 
+ 
+print("\n=== SEMANTIC ===\n") 
+print(results["semantic_results"]) 
+ 
+print("\n=== KEYWORD ===\n") 
+print(results["keyword_results"]) 
+`` 
+ 
+FINAL semantic_search.py 
+from app.embeddings.vectordb import ( 
+    collection 
+) 
+ 
+from app.embeddings.embedder import ( 
+    create_embedding 
+) 
+ 
+def semantic_search(query, top_k=5): 
+ 
+    query_embedding = create_embedding( 
+        query 
+    ) 
+ 
+    results = collection.query( 
+        query_embeddings=[query_embedding], 
+        n_results=top_k 
+    ) 
+ 
+    return results 
+ 
+   EXPECTED RESULT 
+   Semantic 
+front pad peak temperature 
+rear liner temperature 
+ 
+   Keyword 
+Front pad peak temperature | Maximum | 163 | 179 | 188 
+ 
+   WHY HYBRID IS BETTER 
+Semantic search gives: 
+meaning similarity    
+ 
+Keyword search gives: 
+exact engineering terms    
+ 
+   COMBINED = MUCH BETTER RAG 
+Especially for: 
+   engineering metrics 
+   component names 
+   exact measurements 
+   conditions 
+   units 
+`` 
+ 
+   DAY 8 RESULT 
+Your system now supports: 
+   semantic retrieval 
+   exact retrieval 
+   metadata-aware retrieval 
+   engineering search 
+   hybrid retrieval 
+ 
+   CURRENT SYSTEM 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Hybrid Retrieval    
+ 
+   YOU ARE NOW HERE 
+   DAY 8 COMPLETE 
+Next: 
+DAY 9 
+→ reranking 
+→ metadata filters 
+→ engineering-aware retrieval ranking 
+→ context assembly 
+ 
+
+--- END OF FILE: w2d8.pdf ---
+
+
+--- START OF FILE: w2d9.pdf ---
+
+        DAY 9 — RERANKING + CONTEXT ASSEMBLY + ENGINEERING RETRIEVAL 
+   GOAL 
+Move from: 
+retrieved chunks    
+to: 
+BEST engineering context for LLM    
+ 
+   WHY DAY 9 IS IMPORTANT 
+Current Day 8: 
+semantic retrieval    
+keyword retrieval    
+BUT: 
+results still noisy 
+duplicates exist 
+ranking weak 
+Example: 
+Average rows 
+Maximum rows 
+duplicate pages 
+partial matches 
+ 
+   DAY 9 FIXES 
+   reranking 
+   duplicate removal 
+   context assembly 
+   better LLM prompts 
+   cleaner final answers 
+ 
+   DAY 9 ARCHITECTURE 
+User Query 
+   ↓ 
+Semantic Retrieval 
+   + 
+Keyword Retrieval 
+   ↓ 
+Merge Results 
+   ↓ 
+Reranker    
+   ↓ 
+Deduplication    
+   ↓ 
+Context Builder    
+   ↓ 
+LLM Prompt    
+ 
+   TEMPLATE STRUCTURE 
+app/ 
+├── reranker/ 
+│   ├── rerank.py    
+│ 
+├── context/ 
+│   ├── context_builder.py    
+│ 
+├── query/ 
+│   ├── hybrid_search.py    MODIFY 
+│ 
+├── agent/ 
+│   ├── ask.py    NEW 
+ 
+   STEP 1 — INSTALL RERANKER 
+pip install sentence-transformers 
+ 
+   STEP 2 — RERANKER 
+     app/reranker/rerank.py 
+from sentence_transformers import ( 
+    CrossEncoder 
+) 
+ 
+reranker = CrossEncoder( 
+    "BAAI/bge-reranker-base" 
+) 
+ 
+def rerank_results(query, documents): 
+ 
+    pairs = [] 
+ 
+    for doc in documents: 
+        pairs.append([ 
+            query, 
+            doc["document"] 
+        ]) 
+ 
+    scores = reranker.predict(pairs) 
+ 
+    ranked = [] 
+ 
+    for doc, score in zip(documents, scores): 
+ 
+        doc["rerank_score"] = float(score) 
+ 
+        ranked.append(doc) 
+ 
+    ranked = sorted( 
+        ranked, 
+        key=lambda x: x["rerank_score"], 
+        reverse=True 
+    ) 
+ 
+    return ranked 
+ 
+   STEP 3 — IMPROVE HYBRID SEARCH 
+     app/query/hybrid_search.py 
+from app.query.semantic_search import ( 
+    semantic_search 
+) 
+ 
+from app.query.keyword_search import ( 
+    keyword_search 
+) 
+ 
+from app.reranker.rerank import ( 
+    rerank_results 
+) 
+ 
+def hybrid_search(query): 
+ 
+    semantic = semantic_search( 
+        query, 
+        top_k=10 
+    ) 
+ 
+    semantic_docs = [] 
+ 
+    docs = semantic["documents"][0] 
+    metas = semantic["metadatas"][0] 
+ 
+    for doc, meta in zip(docs, metas): 
+ 
+        semantic_docs.append({ 
+            "document": doc, 
+            "metadata": meta, 
+            "source": "semantic" 
+        }) 
+ 
+    keyword_docs = keyword_search(query) 
+ 
+    combined = semantic_docs + keyword_docs 
+ 
+    #    deduplicate 
+    unique = {} 
+ 
+    for item in combined: 
+        unique[item["document"]] = item 
+ 
+    final_docs = list(unique.values()) 
+ 
+    #    rerank 
+    reranked = rerank_results( 
+        query, 
+        final_docs 
+    ) 
+ 
+    return reranked[:5] 
+ 
+   STEP 4 — CONTEXT BUILDER 
+     app/context/context_builder.py 
+def build_context(results): 
+ 
+    context = [] 
+ 
+    for idx, r in enumerate(results): 
+ 
+        chunk = f""" 
+[Context {idx+1}] 
+Page: {r['metadata']['page']} 
+ 
+{r['document']} 
+""" 
+ 
+        context.append(chunk) 
+ 
+    return "\n" .join(context) 
+ 
+   STEP 5 — QWEN QUERY AGENT 
+     app/agent/ask.py 
+import ollama 
+ 
+from app.query.hybrid_search import ( 
+    hybrid_search 
+) 
+ 
+from app.context.context_builder import ( 
+    build_context 
+) 
+ 
+def ask_question(query): 
+ 
+    results = hybrid_search(query) 
+ 
+    context = build_context(results) 
+ 
+    prompt = f""" 
+You are an automotive engineering assistant. 
+ 
+Use ONLY the provided context. 
+ 
+Context: 
+{context} 
+ 
+Question: 
+{query} 
+""" 
+ 
+    response = ollama.chat( 
+        model="qwen2.5" , 
+ 
+        messages=[ 
+            { 
+                "role": "user" , 
+                "content": prompt 
+            } 
+        ] 
+    ) 
+ 
+    return response["message"]["content"] 
+ 
+   STEP 6 — TEST AGENT 
+     tests/test_agent.py 
+from app.agent.ask import ( 
+    ask_question 
+) 
+ 
+response = ask_question( 
+    "What is the maximum front pad temperature?" 
+) 
+ 
+print("\n=== RESPONSE ===\n") 
+ 
+print(response) 
+ 
+   EXPECTED RESULT 
+The maximum front pad peak temperature observed: 
+ 
+CDT : 163 deg C 
+GHD : 179 deg C 
+HSD : 188 deg C 
+ 
+   WHAT DAY 9 ACHIEVES 
+   reranking 
+   context assembly 
+   engineering QA 
+   duplicate removal 
+   cleaner retrieval 
+   better answers 
+   local engineering copilot 
+ 
+   YOUR SYSTEM NOW 
+PDF 
+↓ 
+Extraction 
+↓ 
+Normalization 
+↓ 
+Filtering 
+↓ 
+Embeddings 
+↓ 
+ChromaDB 
+↓ 
+Hybrid Search 
+↓ 
+Reranking    
+↓ 
+Context Builder    
+↓ 
+Qwen2.5    
+ 
+   YOU ARE NOW HERE 
+   DAY 9 COMPLETE 
+Next: 
+DAY 10 
+→ metadata-aware analytics 
+→ structured querying 
+→ engineering calculations 
+→ DuckDB integration 
+ 
+
+--- END OF FILE: w2d9.pdf ---
+
