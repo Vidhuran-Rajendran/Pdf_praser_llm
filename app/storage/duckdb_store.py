@@ -10,6 +10,7 @@ def initialize_db():
         chunk_id TEXT,
         page INTEGER,
         table_id TEXT,
+        row_index INTEGER,
         content TEXT
     )
     """)
@@ -31,6 +32,8 @@ def insert_chunks(chunks):
             chunk["metadata"]["page"],
 
             chunk["metadata"]["table_id"],
+            
+            chunk["metadata"]["row_index"],
 
             chunk["text"]
 

@@ -1,15 +1,7 @@
-from app.query.semantic_search import (
-    semantic_search
-)
-
-from app.query.keyword_search import (
-    keyword_search
-)
-
-from app.reranker.rerank import (
-    rerank_results
-)
-
+from app.query.semantic_search import semantic_search
+from app.query.keyword_search import keyword_search
+from app.reranker.rerank import rerank_results
+from app.retrival.neighbor_retriever import get_neighbor_chunks
 
 def hybrid_search(query):
 
@@ -66,4 +58,15 @@ def hybrid_search(query):
     )
 
     # ✅ MUST RETURN LIST
-    return list(reranked[:5])
+    expanded_results = []
+    for r in reranked[:5]:
+        expanded_results.append(r)
+        metadata = r["metadata"]
+        table_id = metadata["table_id"]
+        row_index = metadata.get("row_index",0)
+        neighbors = get_neighbor_chunks(table_id=table_id,row_index=row_index,window=2)
+
+        for n in neighbors:
+            expanded_results.append({"document": n,"metadata": metadata,"source": "neighbor"})
+
+    return expanded_results

@@ -1,42 +1,18 @@
-def build_reasoning_prompt(query,context):
-    prompt = f"""
-You are an automotive engineering copilot.
+def build_reasoning_prompt(query, context):
 
-Use ONLY the provided context.
+    return f"""
+You are an automotive engineering assistant.
 
-Perform:
-- engineering reasoning
-- comparisons
-- observations
-- trend analysis
-- recommendations
+Answer ONLY using the provided context.
 
-DO NOT use external knowledge.
-
-If information is unavailable,
-say:
+If answer is not present, say:
 "Answer not found in context."
 
-====================
-ENGINEERING CONTEXT
-====================
-
+Context:
 {context}
 
-====================
-QUESTION
-====================
-
+Question:
 {query}
 
-====================
-RESPONSE FORMAT
-====================
-
-1. Direct Answer
-2. Engineering Observations
-3. Comparative Insights
-4. Recommendations
-
+Give concise factual answer.
 """
-    return prompt
