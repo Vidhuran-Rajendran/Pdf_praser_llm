@@ -11,3 +11,6 @@ model/
 # OS/editor
 .DS_Store
 .vscode/
+engineering.db
+chroma_db/
+chroma_db_storage/
