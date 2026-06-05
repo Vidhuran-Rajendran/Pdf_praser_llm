@@ -5,10 +5,7 @@ def route_query(query):
     sql_keywords = [
 
         "count",
-        "total",
-        "sum",
-        "average",
-        "compare",
+        "how many",
         "page"
 
     ]

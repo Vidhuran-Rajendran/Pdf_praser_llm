@@ -1,34 +1,41 @@
 def dataframe_to_chunks(table):
 
-    chunks = []
-
     df = table["df"]
 
     page = table["page"]
 
     table_id = table["table_id"]
 
-    for idx, row in df.iterrows():
+    rows = []
+
+    for _, row in df.iterrows():
 
         values = [
-            str(v)
+
+            str(v).strip()
+
             for v in row.values
         ]
 
-        text = " | ".join(values)
+        row_text = " | ".join(values)
 
-        chunks.append({
-            "id": f"{table_id}_row_{idx}",
-            "text": text,
+        rows.append(row_text)
 
-            "metadata": {
-                "page": page,
-                "table_id": table_id,
+    # ✅ FULL TABLE CHUNK
+    full_text = "\n".join(rows)
 
-                # ✅ searchable metadata
-                "row_index": idx,
-                "source": "table"
-            }
-        })
+    return [{
 
-    return chunks
+        "id": table_id,
+
+        "text": full_text,
+
+        "metadata": {
+
+            "page": page,
+
+            "table_id": table_id,
+
+            "source": "table"
+        }
+    }]

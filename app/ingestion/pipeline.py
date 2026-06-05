@@ -5,13 +5,13 @@ from app.parser.quality_scorer import filter_useful_tables
 from app.embeddings.chunker import dataframe_to_chunks
 from app.embeddings.vectordb import store_chunks
 from app.storage.duckdb_store import initialize_db,insert_chunks
-
+from app.parser.camelot_parser import extract_tables_camelot
 
 
 def process_pdf(file_path):
 
     pages = build_page_view(file_path)
-    raw_tables = extract_tables_pdf(file_path)
+    raw_tables = extract_tables_camelot(file_path)
     normalized_tables = normalize_tables(raw_tables)
     useful_tables = filter_useful_tables(normalized_tables)
     
