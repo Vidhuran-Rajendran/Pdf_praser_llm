@@ -14,3 +14,9 @@ model/
 engineering.db
 chroma_db/
 chroma_db_storage/
+venv/
+chroma_db/
+engineering.db
+__pycache__/
+.cache/
+data/*.pdfcurriculum/merged_output.pdf
