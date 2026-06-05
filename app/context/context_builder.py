@@ -1,16 +1,10 @@
-def build_context(results):
+def build_structured_context(chunks):
 
-    context = []
-
-    for idx, r in enumerate(results):
-
-        chunk = f"""
+    sections = []
+    for idx, chunk in enumerate(chunks):
+        block = f"""
 [Context {idx+1}]
-Page: {r['metadata']['page']}
-
-{r['document']}
+{chunk}
 """
-
-        context.append(chunk)
-
-    return "\n".join(context)
+        sections.append(block)
+    return "\n".join(sections)
