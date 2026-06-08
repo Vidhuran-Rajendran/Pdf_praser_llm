@@ -53,50 +53,34 @@ def is_section_header(row_text):
         return True
 
     return False
+
 def chunk_text_pages(pages):
-
-    chunks = []
-
-    for page_data in pages:
-
-        page = page_data["page"]
-        text = page_data["text"]
-
-        lines = text.split("\n")
-
-        buffer = []
-
-        for line in lines:
-
-            cleaned = line.strip()
-
-            if not cleaned:
-                continue
-
-            buffer.append(cleaned)
-
-            # ✅ small chunk size (stable)
-            if len(buffer) >= 5:
-
-                chunks.append({
-                    "id": f"text_{page}_{len(chunks)}",
-                    "text": "\n".join(buffer),
-                    "metadata": {
-                        "page": page,
-                        "source": "text"
-                    }
-                })
-
-                buffer = []
-
-        if buffer:
-            chunks.append({
-                "id": f"text_{page}_{len(chunks)}",
-                "text": "\n".join(buffer),
-                "metadata": {
-                    "page": page,
-                    "source": "text"
-                }
-            })
-
-    return chunks
+   chunks = []
+   for page_data in pages:
+       page = page_data["page"]
+       content = page_data.get("content", [])
+       text_lines = [
+           item["value"]
+           for item in content
+           if item["type"] == "text"
+       ]
+       buffer = []
+       for line in text_lines:
+           cleaned = line.strip()
+           if not cleaned:
+               continue
+           buffer.append(cleaned)
+           if len(buffer) >= 5:
+               chunks.append({
+                   "id": f"text_{page}_{len(chunks)}",
+                   "text": "\n".join(buffer),
+                   "metadata": {"page": page, "source": "text"}
+               })
+               buffer = []
+       if buffer:
+           chunks.append({
+               "id": f"text_{page}_{len(chunks)}",
+               "text": "\n".join(buffer),
+               "metadata": {"page": page, "source": "text"}
+           })
+   return chunks

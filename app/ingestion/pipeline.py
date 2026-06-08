@@ -45,30 +45,33 @@ def process_pdf(file_path):
     }
 
 
-
 def extract_project_name(pages):
-    for page in pages[:5]:
-        text = page["text"]
-        lines = text.split("\n")
-        
-        for line in lines:
-            if "project no" in line.lower():
-                match = re.search(r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",line,re.IGNORECASE)
-
-                if match:
-                    return match.group(1).upper()
-
-    return "UNKNOWN_PROJECT"
+   for page in pages[:5]:
+       # content is a list of dicts, not a string
+       text_lines = [
+           item["value"] 
+           for item in page["content"] 
+           if item["type"] == "text"
+       ]
+       for line in text_lines:
+           if "project no" in line.lower():
+               import re
+               match = re.search(
+                   r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
+                   line, re.IGNORECASE
+               )
+               if match:
+                   return match.group(1).upper()
+   return "UNKNOWN_PROJECT"
 
 def extract_dvp_text(pages, file_path):
-    # ✅ Try from first page title
-    first_page = pages[0]["text"]
-    lines = first_page.split("\n")
-
-    for line in lines:
-        if "evaluation" in line.lower() or "test" in line.lower():
-            return line.strip()
-
-    # ✅ fallback → filename
-    name = os.path.basename(file_path)
-    return name.replace(".pdf", "")
+   text_lines = [
+       item["value"]
+       for item in pages[0]["content"]
+       if item["type"] == "text"
+   ]
+   for line in text_lines:
+       if "evaluation" in line.lower() or "test" in line.lower():
+           return line.strip()
+   import os
+   return os.path.basename(file_path).replace(".pdf", "")

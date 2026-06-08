@@ -14,6 +14,7 @@ FILE: all_branches_code.txt
 FILE: main.py
 ------------------------------------------------------------
 import os
+import shutil
 from app.ingestion.pipeline import process_pdf
 from app.agent.ask import ask_question
 from app.memory.session_memory import clear_history
@@ -22,30 +23,67 @@ from app.ingestion.multi_pdf_ingest import ingest_folder
 
 PDF_FOLDER = r"E:\New folder\Pdf_praser_llm\data"
 
-# ✅ ingest only once
-if not os.path.exists("chroma_db"):
-    print("\n✅ Multi-PDF ingestion started...\n")
-    ingest_folder(PDF_FOLDER)
-    print("\n✅ Ingestion completed.\n")
+# # ✅ ingest only once
+# if not os.path.exists("chroma_db"):
+#     print("\n✅ Multi-PDF ingestion started...\n")
+#     ingest_folder(PDF_FOLDER)
+#     print("\n✅ Ingestion completed.\n")
 
+# else:
+#     print("\n✅ Existing DB found. Skipping ingestion.\n")
+
+
+# while True:
+#     query = input("\nAsk: ")
+
+#     if query.lower() == "exit":
+#         break
+
+#     if query.lower() == "clear":
+#         clear_history()
+#         print("\n✅ Memory cleared.\n")
+#         continue
+
+#     response = ask_question(query)
+#     print("\n=== RESPONSE ===\n")
+#     print(response)
+
+import os
+from app.ingestion.multi_pdf_ingest import ingest_folder
+from app.agent.ask import ask_question
+from app.memory.session_memory import clear_history
+from app.storage.duckdb_store import conn
+
+PDF_FOLDER = r"E:\New folder\Pdf_praser_llm\data"
+
+# ✅ check DuckDB row count, NOT chroma_db folder
+def db_has_data():
+   try:
+       result = conn.execute(
+           "SELECT COUNT(*) FROM engineering_chunks"
+       ).fetchone()
+       return result[0] > 0
+   except:
+       return False
+
+if not db_has_data():
+   print("\n✅ No data found. Starting ingestion...\n")
+   ingest_folder(PDF_FOLDER)
+   print("\n✅ Ingestion completed.\n")
 else:
-    print("\n✅ Existing DB found. Skipping ingestion.\n")
-
+   print("\n✅ Data found. Skipping ingestion.\n")
 
 while True:
-    query = input("\nAsk: ")
-
-    if query.lower() == "exit":
-        break
-
-    if query.lower() == "clear":
-        clear_history()
-        print("\n✅ Memory cleared.\n")
-        continue
-
-    response = ask_question(query)
-    print("\n=== RESPONSE ===\n")
-    print(response)
+   query = input("\nAsk: ")
+   if query.lower() == "exit":
+       break
+   if query.lower() == "clear":
+       clear_history()
+       print("\n✅ Memory cleared.\n")
+       continue
+   response = ask_question(query)
+   print("\n=== RESPONSE ===\n")
+   print(response)
 
 
 ------------------------------------------------------------
@@ -1641,7 +1679,7 @@ def ask_question(query):
     response = ollama.chat(model="qwen2.5",messages=[{"role": "user","content": prompt}])
     answer = response["message"]["content"]
     print("tool: ", tool_output["tool"])
-    print("result : ", tool_output["results"][:2])
+    #print("result : ", tool_output["results"][:2])
 
     # ✅ store assistant response
     add_message("assistant",answer)
@@ -1656,6 +1694,8 @@ def filter_by_dvp(query, results):
             continue
         dvp_emb = np.array(create_embedding(dvp_text)).reshape(1, -1)
         score = cosine_similarity(query_emb,dvp_emb)[0][0]
+        if score<0.5:
+            continue
         scored.append((score, r))
 
     scored.sort(reverse=True, key=lambda x: x[0])
@@ -1962,54 +2002,37 @@ def is_section_header(row_text):
         return True
 
     return False
+
 def chunk_text_pages(pages):
-
-    chunks = []
-
-    for page_data in pages:
-
-        page = page_data["page"]
-        text = page_data["text"]
-
-        lines = text.split("\n")
-
-        buffer = []
-
-        for line in lines:
-
-            cleaned = line.strip()
-
-            if not cleaned:
-                continue
-
-            buffer.append(cleaned)
-
-            # ✅ small chunk size (stable)
-            if len(buffer) >= 5:
-
-                chunks.append({
-                    "id": f"text_{page}_{len(chunks)}",
-                    "text": "\n".join(buffer),
-                    "metadata": {
-                        "page": page,
-                        "source": "text"
-                    }
-                })
-
-                buffer = []
-
-        if buffer:
-            chunks.append({
-                "id": f"text_{page}_{len(chunks)}",
-                "text": "\n".join(buffer),
-                "metadata": {
-                    "page": page,
-                    "source": "text"
-                }
-            })
-
-    return chunks
-
+   chunks = []
+   for page_data in pages:
+       page = page_data["page"]
+       content = page_data.get("content", [])
+       text_lines = [
+           item["value"]
+           for item in content
+           if item["type"] == "text"
+       ]
+       buffer = []
+       for line in text_lines:
+           cleaned = line.strip()
+           if not cleaned:
+               continue
+           buffer.append(cleaned)
+           if len(buffer) >= 5:
+               chunks.append({
+                   "id": f"text_{page}_{len(chunks)}",
+                   "text": "\n".join(buffer),
+                   "metadata": {"page": page, "source": "text"}
+               })
+               buffer = []
+       if buffer:
+           chunks.append({
+               "id": f"text_{page}_{len(chunks)}",
+               "text": "\n".join(buffer),
+               "metadata": {"page": page, "source": "text"}
+           })
+   return chunks
 
 
 ------------------------------------------------------------
@@ -2143,33 +2166,36 @@ def process_pdf(file_path):
     }
 
 
-
 def extract_project_name(pages):
-    for page in pages[:5]:
-        text = page["text"]
-        lines = text.split("\n")
-        
-        for line in lines:
-            if "project no" in line.lower():
-                match = re.search(r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",line,re.IGNORECASE)
-
-                if match:
-                    return match.group(1).upper()
-
-    return "UNKNOWN_PROJECT"
+   for page in pages[:5]:
+       # content is a list of dicts, not a string
+       text_lines = [
+           item["value"] 
+           for item in page["content"] 
+           if item["type"] == "text"
+       ]
+       for line in text_lines:
+           if "project no" in line.lower():
+               import re
+               match = re.search(
+                   r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
+                   line, re.IGNORECASE
+               )
+               if match:
+                   return match.group(1).upper()
+   return "UNKNOWN_PROJECT"
 
 def extract_dvp_text(pages, file_path):
-    # ✅ Try from first page title
-    first_page = pages[0]["text"]
-    lines = first_page.split("\n")
-
-    for line in lines:
-        if "evaluation" in line.lower() or "test" in line.lower():
-            return line.strip()
-
-    # ✅ fallback → filename
-    name = os.path.basename(file_path)
-    return name.replace(".pdf", "")
+   text_lines = [
+       item["value"]
+       for item in pages[0]["content"]
+       if item["type"] == "text"
+   ]
+   for line in text_lines:
+       if "evaluation" in line.lower() or "test" in line.lower():
+           return line.strip()
+   import os
+   return os.path.basename(file_path).replace(".pdf", "")
 
 
 ------------------------------------------------------------
@@ -7590,5 +7616,10 @@ FILE: __init__.py
 
 ================================================================================
 FOLDER: E:\New folder\Pdf_praser_llm\tests\__pycache__
+================================================================================
+
+
+================================================================================
+FOLDER: E:\New folder\Pdf_praser_llm\__pycache__
 ================================================================================
 

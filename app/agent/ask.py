@@ -29,7 +29,7 @@ def ask_question(query):
     response = ollama.chat(model="qwen2.5",messages=[{"role": "user","content": prompt}])
     answer = response["message"]["content"]
     print("tool: ", tool_output["tool"])
-    print("result : ", tool_output["results"][:2])
+    #print("result : ", tool_output["results"][:2])
 
     # ✅ store assistant response
     add_message("assistant",answer)
@@ -44,6 +44,8 @@ def filter_by_dvp(query, results):
             continue
         dvp_emb = np.array(create_embedding(dvp_text)).reshape(1, -1)
         score = cosine_similarity(query_emb,dvp_emb)[0][0]
+        if score<0.5:
+            continue
         scored.append((score, r))
 
     scored.sort(reverse=True, key=lambda x: x[0])
