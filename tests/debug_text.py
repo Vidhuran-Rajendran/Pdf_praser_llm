@@ -27,6 +27,8 @@
 # tests/debug_chunks.py
 from app.storage.duckdb_store import conn
 
+
+
 rows = conn.execute("""
   SELECT chunk_id, page, table_id, content 
   FROM engineering_chunks
