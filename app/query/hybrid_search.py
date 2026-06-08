@@ -7,7 +7,8 @@ def hybrid_search(query):
 
     semantic = semantic_search(
         query,
-        top_k=10
+        top_k=10,
+        
     )
 
     semantic_docs = []
