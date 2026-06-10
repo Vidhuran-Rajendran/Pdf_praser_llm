@@ -1,4 +1,4 @@
-import re,os
+import os
 from collections import Counter
 from app.parser.page_builder import build_page_view
 from app.parser.pdfplumber_table import extract_tables_pdf
@@ -8,6 +8,8 @@ from app.embeddings.chunker import dataframe_to_chunks,chunk_text_pages
 from app.embeddings.vectordb import store_chunks
 from app.storage.duckdb_store import initialize_db,insert_chunks
 from app.parser.camelot_parser import extract_tables_camelot
+from app.parser.image_extractor import extract_images
+from app.embeddings.image_processor import extract_text_from_image
 
 
 
@@ -20,23 +22,45 @@ def process_pdf(file_path):
     raw_tables = extract_tables_camelot(file_path)
     normalized_tables = normalize_tables(raw_tables)
     useful_tables = filter_useful_tables(normalized_tables)
+    images = extract_images(file_path)
     
     all_chunks = []
+    image_chunks = []
+
+    for img in images:
+        text = extract_text_from_image(img["path"])
+        
+        chunk = {
+                "id": f"image_{img['page']}",
+                "text": text,
+                "metadata": {
+                    "page": img["page"],
+                    "project": project_name,
+                    "dvp_text": dvp_text,
+                    "source": "image"
+                }
+            }
+
+        image_chunks.append(chunk)
+
+    
     for table in useful_tables:
         chunks = dataframe_to_chunks(table)        
         for c in chunks:
             c["metadata"]["project"] = project_name
             c["metadata"]["dvp_text"] = dvp_text
         all_chunks.extend(chunks)
-        text_chunks = chunk_text_pages(pages)
-        
-        for t in text_chunks:
-            t["metadata"]["project"] = project_name
-            t["metadata"]["dvp_text"] = dvp_text
-    store_chunks(all_chunks)
+    text_chunks = chunk_text_pages(pages)
+    
+    for t in text_chunks:
+        t["metadata"]["project"] = project_name
+        t["metadata"]["dvp_text"] = dvp_text
+    combined_chunks = all_chunks + text_chunks + image_chunks
+
+    store_chunks(combined_chunks)
     
     initialize_db()
-    insert_chunks(all_chunks)
+    insert_chunks(combined_chunks)
 
     return {
         "pages": pages,
@@ -73,5 +97,4 @@ def extract_dvp_text(pages, file_path):
    for line in text_lines:
        if "evaluation" in line.lower() or "test" in line.lower():
            return line.strip()
-   import os
    return os.path.basename(file_path).replace(".pdf", "")
