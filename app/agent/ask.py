@@ -12,38 +12,64 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 
+
 def ask_question(query):
 
-    # ✅ save user query
-    add_message("user",query)
-    
-    enhanced_query = rewrite_query(query)
-    tool_output = run_agent(enhanced_query)
+    tool_output = run_agent(query)
+    is_compare = "compare" in query.lower()
     results = tool_output["results"]
-    # ✅ APPLY DVP FILTER HERE
-    filtered_results = filter_by_dvp(query, results)
-    
-    # ✅ ADD THIS (IMPORTANT)
-    image_results = [
-        r for r in results
-        if r["metadata"].get("source") == "image"
-    ]
 
-    # ✅ ADD images back for graph queries
-    filtered_results.extend(image_results)
+    # ✅ STRICT DOCUMENT LOCK
+    query_lower = query.lower()
+    matched_docs = []
+
+    for r in results:
+        dvp = r["metadata"].get("dvp_text", "").lower()
+        if any(word in dvp for word in query_lower.split()):
+            matched_docs.append(r["metadata"]["doc_id"])
+
+    if matched_docs:
+        best_doc = matched_docs[0]   # ✅ PRIORITY
+    else:
+        # fallback normal logic
+        doc_scores = {}
+        for r in results:
+            doc = r["metadata"].get("doc_id")
+            if doc is None:
+                continue
+            doc_scores[doc] = doc_scores.get(doc, 0) + 1
+        best_doc = max(doc_scores.items(), key=lambda item: item[1])[0]
+
+    filtered_results = [r for r in results if r["metadata"].get("doc_id") == best_doc]
+    
+    if is_compare:
+        filtered_results = results[:10]   # ✅ multi-doc
+    else:
+        filtered_results = [r for r in results if r["metadata"].get("doc_id") == best_doc]
 
     cleaned_chunks = deduplicate_context(filtered_results)
     context = build_structured_context(cleaned_chunks)
-    prompt = build_reasoning_prompt(query,context)
+    prompt = build_reasoning_prompt(query, context)
     
-    response = ollama.chat(model="qwen2.5",messages=[{"role": "user","content": prompt}])
-    answer = response["message"]["content"]
-    print("tool: ", tool_output["tool"])
-    #print("result : ", tool_output["results"][:2])
+    response = ollama.chat(
+        model="qwen2.5",
+        messages=[{"role": "user", "content": prompt}]
+    )
 
-    # ✅ store assistant response
-    add_message("assistant",answer)
-    return answer
+    answer = response["message"]["content"]
+    top_meta = filtered_results[0]["metadata"]
+
+    return f"""
+📄 PDF: {top_meta.get("pdf_name")}
+📊 DVP: {top_meta.get("dvp_text")}
+🖼 Image Path: {top_meta.get("image_path", "N/A")}
+
+✅ Answer:
+{answer}
+"""
+
+
+
 
 def filter_by_dvp(query, results):
     query_emb = np.array(create_embedding(query)).reshape(1, -1)
@@ -54,8 +80,8 @@ def filter_by_dvp(query, results):
             continue
         dvp_emb = np.array(create_embedding(dvp_text)).reshape(1, -1)
         score = cosine_similarity(query_emb,dvp_emb)[0][0]
-        if score<0.5:
-            continue
+        # if score<0.5:
+        #     continue
         scored.append((score, r))
 
     scored.sort(reverse=True, key=lambda x: x[0])

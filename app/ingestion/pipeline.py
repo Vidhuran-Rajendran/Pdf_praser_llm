@@ -28,15 +28,36 @@ def process_pdf(file_path):
     image_chunks = []
 
     for img in images:
-        text = extract_text_from_image(img["path"])
+        
+        ocr_text = extract_text_from_image(img["path"])
+
+        # ✅ extract title (first line usually)
+        lines = ocr_text.split("\n")
+        title = lines[0] if lines else "unknown graph"
+
+        TEXT = f"""
+        Graph Title: {title}
+
+        {dvp_text}
+        Project: {project_name}
+
+        Data:
+        {ocr_text}
+        """
+
+
         
         chunk = {
                 "id": f"image_{img['page']}_{len(image_chunks)}",
-                "text": text,
+                "text": TEXT,
                 "metadata": {
                     "page": img["page"],
                     "project": project_name,
                     "dvp_text": dvp_text,
+                    "doc_id": file_path,
+                    "pdf_name": os.path.basename(file_path),
+                    "image_path": img["path"],
+                    "graph_title": title,
                     "source": "image"
                 }
             }
@@ -45,16 +66,22 @@ def process_pdf(file_path):
 
     
     for table in useful_tables:
-        chunks = dataframe_to_chunks(table)        
+        chunks = dataframe_to_chunks(table,file_path)        
         for c in chunks:
             c["metadata"]["project"] = project_name
-            c["metadata"]["dvp_text"] = dvp_text
+            c["metadata"]["dvp_text"] = dvp_text            
+            c["metadata"]["pdf_name"] = os.path.basename(file_path)
+            c["metadata"]["doc_id"] = file_path
+
         all_chunks.extend(chunks)
     text_chunks = chunk_text_pages(pages)
     
     for t in text_chunks:
         t["metadata"]["project"] = project_name
         t["metadata"]["dvp_text"] = dvp_text
+        t["metadata"]["pdf_name"] = os.path.basename(file_path)
+        t["metadata"]["doc_id"] = file_path
+
     combined_chunks = all_chunks + text_chunks + image_chunks
 
     store_chunks(combined_chunks)
@@ -69,32 +96,30 @@ def process_pdf(file_path):
     }
 
 
+
 def extract_project_name(pages):
-   for page in pages[:5]:
-       # content is a list of dicts, not a string
-       text_lines = [
-           item["value"] 
-           for item in page["content"] 
-           if item["type"] == "text"
-       ]
-       for line in text_lines:
-           if "project no" in line.lower():
-               import re
-               match = re.search(
-                   r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
-                   line, re.IGNORECASE
-               )
-               if match:
-                   return match.group(1).upper()
-   return "UNKNOWN_PROJECT"
+    for page in pages[:5]:
+        for item in page["content"]:
+            if item["type"] == "text":
+                line = item["value"]
+
+                if "project no" in line.lower():
+                    import re
+                    match = re.search(
+                        r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
+                        line, re.IGNORECASE
+                    )
+                    if match:
+                        return match.group(1).upper()
+
+    return "UNKNOWN_PROJECT"
+
 
 def extract_dvp_text(pages, file_path):
-   text_lines = [
-       item["value"]
-       for item in pages[0]["content"]
-       if item["type"] == "text"
-   ]
-   for line in text_lines:
-       if "evaluation" in line.lower() or "test" in line.lower():
-           return line.strip()
-   return os.path.basename(file_path).replace(".pdf", "")
+
+    for item in pages[0]["content"]:
+        if item["type"] == "text":
+            line = item["value"]
+
+            if "evaluation" in line.lower() or "test" in line.lower():
+                return line.strip()

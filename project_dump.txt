@@ -1662,38 +1662,64 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 
+
 def ask_question(query):
 
-    # ✅ save user query
-    add_message("user",query)
-    
-    enhanced_query = rewrite_query(query)
-    tool_output = run_agent(enhanced_query)
+    tool_output = run_agent(query)
+    is_compare = "compare" in query.lower()
     results = tool_output["results"]
-    # ✅ APPLY DVP FILTER HERE
-    filtered_results = filter_by_dvp(query, results)
-    
-    # ✅ ADD THIS (IMPORTANT)
-    image_results = [
-        r for r in results
-        if r["metadata"].get("source") == "image"
-    ]
 
-    # ✅ ADD images back for graph queries
-    filtered_results.extend(image_results)
+    # ✅ STRICT DOCUMENT LOCK
+    query_lower = query.lower()
+    matched_docs = []
+
+    for r in results:
+        dvp = r["metadata"].get("dvp_text", "").lower()
+        if any(word in dvp for word in query_lower.split()):
+            matched_docs.append(r["metadata"]["doc_id"])
+
+    if matched_docs:
+        best_doc = matched_docs[0]   # ✅ PRIORITY
+    else:
+        # fallback normal logic
+        doc_scores = {}
+        for r in results:
+            doc = r["metadata"].get("doc_id")
+            if doc is None:
+                continue
+            doc_scores[doc] = doc_scores.get(doc, 0) + 1
+        best_doc = max(doc_scores.items(), key=lambda item: item[1])[0]
+
+    filtered_results = [r for r in results if r["metadata"].get("doc_id") == best_doc]
+    
+    if is_compare:
+        filtered_results = results[:10]   # ✅ multi-doc
+    else:
+        filtered_results = [r for r in results if r["metadata"].get("doc_id") == best_doc]
 
     cleaned_chunks = deduplicate_context(filtered_results)
     context = build_structured_context(cleaned_chunks)
-    prompt = build_reasoning_prompt(query,context)
+    prompt = build_reasoning_prompt(query, context)
     
-    response = ollama.chat(model="qwen2.5",messages=[{"role": "user","content": prompt}])
-    answer = response["message"]["content"]
-    print("tool: ", tool_output["tool"])
-    #print("result : ", tool_output["results"][:2])
+    response = ollama.chat(
+        model="qwen2.5",
+        messages=[{"role": "user", "content": prompt}]
+    )
 
-    # ✅ store assistant response
-    add_message("assistant",answer)
-    return answer
+    answer = response["message"]["content"]
+    top_meta = filtered_results[0]["metadata"]
+
+    return f"""
+📄 PDF: {top_meta.get("pdf_name")}
+📊 DVP: {top_meta.get("dvp_text")}
+🖼 Image Path: {top_meta.get("image_path", "N/A")}
+
+✅ Answer:
+{answer}
+"""
+
+
+
 
 def filter_by_dvp(query, results):
     query_emb = np.array(create_embedding(query)).reshape(1, -1)
@@ -1704,8 +1730,8 @@ def filter_by_dvp(query, results):
             continue
         dvp_emb = np.array(create_embedding(dvp_text)).reshape(1, -1)
         score = cosine_similarity(query_emb,dvp_emb)[0][0]
-        if score<0.5:
-            continue
+        # if score<0.5:
+        #     continue
         scored.append((score, r))
 
     scored.sort(reverse=True, key=lambda x: x[0])
@@ -1961,29 +1987,56 @@ import re
 
 # app/embeddings/chunker.py - replace entire file
 
-def dataframe_to_chunks(table):
-   df = table["df"]
-   page = table["page"]
-   table_id = table["table_id"]
 
-   rows = []
-   for _, row in df.iterrows():
-       values = [str(v).strip() for v in row.values]
-       cleaned = [v for v in values if v.lower()not in ["nan","none",""]]
-       row_text = " | ".join(cleaned)
-       rows.append(row_text)
+def dataframe_to_chunks(table, doc_id):
 
-   full_text = "\n".join(rows)
+    df = table["df"]
+    page = table["page"]
+    table_id = table["table_id"]
 
-   return [{
-       "id": table_id,
-       "text": full_text,
-       "metadata": {
-           "page": page,
-           "table_id": table_id,
-           "source": "table"
-       }
-   }]
+    row_chunks = []
+    rows = []
+
+    for idx, row in df.iterrows():
+
+        values = [str(v).strip() for v in row.values]
+        cleaned = [v for v in values if v.lower() not in ["nan", "none", ""]]
+
+        if not cleaned:
+            continue
+
+        row_text = " | ".join(cleaned)
+        rows.append(row_text)
+
+        # ✅ ROW CHUNK
+        row_chunks.append({
+            "id": f"{table_id}_{idx}",
+            "text": row_text,
+            "metadata": {
+                "page": page,
+                "table_id": table_id,
+                "row_index": idx,
+                "type": "row",
+                "source": "table",
+                "doc_id": doc_id
+            }
+        })
+
+    # ✅ FULL TABLE CHUNK
+    full_chunk = {
+        "id": f"{table_id}_full",
+        "text": "\n".join(rows),
+        "metadata": {
+            "page": page,
+            "table_id": table_id,
+            "type": "full_table",
+            "source": "table",
+            "doc_id": doc_id
+        }
+    }
+
+    return row_chunks + [full_chunk]
+
    
    
 def is_section_header(row_text):
@@ -2169,15 +2222,36 @@ def process_pdf(file_path):
     image_chunks = []
 
     for img in images:
-        text = extract_text_from_image(img["path"])
+        
+        ocr_text = extract_text_from_image(img["path"])
+
+        # ✅ extract title (first line usually)
+        lines = ocr_text.split("\n")
+        title = lines[0] if lines else "unknown graph"
+
+        TEXT = f"""
+        Graph Title: {title}
+
+        {dvp_text}
+        Project: {project_name}
+
+        Data:
+        {ocr_text}
+        """
+
+
         
         chunk = {
                 "id": f"image_{img['page']}_{len(image_chunks)}",
-                "text": text,
+                "text": TEXT,
                 "metadata": {
                     "page": img["page"],
                     "project": project_name,
                     "dvp_text": dvp_text,
+                    "doc_id": file_path,
+                    "pdf_name": os.path.basename(file_path),
+                    "image_path": img["path"],
+                    "graph_title": title,
                     "source": "image"
                 }
             }
@@ -2186,16 +2260,22 @@ def process_pdf(file_path):
 
     
     for table in useful_tables:
-        chunks = dataframe_to_chunks(table)        
+        chunks = dataframe_to_chunks(table,file_path)        
         for c in chunks:
             c["metadata"]["project"] = project_name
-            c["metadata"]["dvp_text"] = dvp_text
+            c["metadata"]["dvp_text"] = dvp_text            
+            c["metadata"]["pdf_name"] = os.path.basename(file_path)
+            c["metadata"]["doc_id"] = file_path
+
         all_chunks.extend(chunks)
     text_chunks = chunk_text_pages(pages)
     
     for t in text_chunks:
         t["metadata"]["project"] = project_name
         t["metadata"]["dvp_text"] = dvp_text
+        t["metadata"]["pdf_name"] = os.path.basename(file_path)
+        t["metadata"]["doc_id"] = file_path
+
     combined_chunks = all_chunks + text_chunks + image_chunks
 
     store_chunks(combined_chunks)
@@ -2210,35 +2290,34 @@ def process_pdf(file_path):
     }
 
 
+
 def extract_project_name(pages):
-   for page in pages[:5]:
-       # content is a list of dicts, not a string
-       text_lines = [
-           item["value"] 
-           for item in page["content"] 
-           if item["type"] == "text"
-       ]
-       for line in text_lines:
-           if "project no" in line.lower():
-               import re
-               match = re.search(
-                   r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
-                   line, re.IGNORECASE
-               )
-               if match:
-                   return match.group(1).upper()
-   return "UNKNOWN_PROJECT"
+    for page in pages[:5]:
+        for item in page["content"]:
+            if item["type"] == "text":
+                line = item["value"]
+
+                if "project no" in line.lower():
+                    import re
+                    match = re.search(
+                        r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
+                        line, re.IGNORECASE
+                    )
+                    if match:
+                        return match.group(1).upper()
+
+    return "UNKNOWN_PROJECT"
+
 
 def extract_dvp_text(pages, file_path):
-   text_lines = [
-       item["value"]
-       for item in pages[0]["content"]
-       if item["type"] == "text"
-   ]
-   for line in text_lines:
-       if "evaluation" in line.lower() or "test" in line.lower():
-           return line.strip()
-   return os.path.basename(file_path).replace(".pdf", "")
+
+    for item in pages[0]["content"]:
+        if item["type"] == "text":
+            line = item["value"]
+
+            if "evaluation" in line.lower() or "test" in line.lower():
+                return line.strip()
+
 
 
 ------------------------------------------------------------
@@ -2411,7 +2490,6 @@ FILE: image_extractor.py
 import fitz
 import os
 
-
 def extract_images(pdf_path, output_folder="images"):
 
     os.makedirs(output_folder, exist_ok=True)
@@ -2420,23 +2498,40 @@ def extract_images(pdf_path, output_folder="images"):
     images = []
 
     for page_num in range(len(doc)):
+
         page = doc[page_num]
+
+        # ✅ use get_images instead of text blocks
         img_list = page.get_images(full=True)
 
         for idx, img in enumerate(img_list):
+
             xref = img[0]
+
             base_image = doc.extract_image(xref)
             image_bytes = base_image["image"]
             ext = base_image["ext"]
-            file_name = f"{output_folder}/page_{page_num}_{idx}.{ext}"
 
-            with open(file_name, "wb") as f:
+            width = img[2]
+            height = img[3]
+
+            # ✅ filter unwanted images (logos / icons)
+            if width < 300 or height < 200:
+                continue
+
+            img_path = f"{output_folder}/page_{page_num}_{idx}.{ext}"
+
+            with open(img_path, "wb") as f:
                 f.write(image_bytes)
 
-            images.append({"path": file_name,"page": page_num})
+            images.append({
+                "path": img_path,
+                "page": page_num,
+                "width": width,
+                "height": height
+            })
 
     return images
-
 
 
 ------------------------------------------------------------

@@ -2,29 +2,56 @@ import re
 
 # app/embeddings/chunker.py - replace entire file
 
-def dataframe_to_chunks(table):
-   df = table["df"]
-   page = table["page"]
-   table_id = table["table_id"]
 
-   rows = []
-   for _, row in df.iterrows():
-       values = [str(v).strip() for v in row.values]
-       cleaned = [v for v in values if v.lower()not in ["nan","none",""]]
-       row_text = " | ".join(cleaned)
-       rows.append(row_text)
+def dataframe_to_chunks(table, doc_id):
 
-   full_text = "\n".join(rows)
+    df = table["df"]
+    page = table["page"]
+    table_id = table["table_id"]
 
-   return [{
-       "id": table_id,
-       "text": full_text,
-       "metadata": {
-           "page": page,
-           "table_id": table_id,
-           "source": "table"
-       }
-   }]
+    row_chunks = []
+    rows = []
+
+    for idx, row in df.iterrows():
+
+        values = [str(v).strip() for v in row.values]
+        cleaned = [v for v in values if v.lower() not in ["nan", "none", ""]]
+
+        if not cleaned:
+            continue
+
+        row_text = " | ".join(cleaned)
+        rows.append(row_text)
+
+        # ✅ ROW CHUNK
+        row_chunks.append({
+            "id": f"{table_id}_{idx}",
+            "text": row_text,
+            "metadata": {
+                "page": page,
+                "table_id": table_id,
+                "row_index": idx,
+                "type": "row",
+                "source": "table",
+                "doc_id": doc_id
+            }
+        })
+
+    # ✅ FULL TABLE CHUNK
+    full_chunk = {
+        "id": f"{table_id}_full",
+        "text": "\n".join(rows),
+        "metadata": {
+            "page": page,
+            "table_id": table_id,
+            "type": "full_table",
+            "source": "table",
+            "doc_id": doc_id
+        }
+    }
+
+    return row_chunks + [full_chunk]
+
    
    
 def is_section_header(row_text):
