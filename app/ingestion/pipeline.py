@@ -31,7 +31,7 @@ def process_pdf(file_path):
         text = extract_text_from_image(img["path"])
         
         chunk = {
-                "id": f"image_{img['page']}",
+                "id": f"image_{img['page']}_{len(image_chunks)}",
                 "text": text,
                 "metadata": {
                     "page": img["page"],

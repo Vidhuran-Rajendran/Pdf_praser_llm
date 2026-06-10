@@ -21,7 +21,7 @@ def insert_chunks(chunks):
        """, (
            chunk["id"],
            chunk["metadata"]["page"],
-           chunk["metadata"]["table_id"],
+           chunk["metadata"].get("table_id", "N/A"),
            chunk["metadata"].get("row_index", 0),
            chunk["text"]
        ))

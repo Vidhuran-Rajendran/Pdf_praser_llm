@@ -17,13 +17,11 @@ def hybrid_search(query):
     if semantic and isinstance(semantic, dict):
         docs = semantic.get("documents")
         metas = semantic.get("metadatas")
-
         # documents/metadatas expected to be lists of lists; try to extract first inner list
         if docs and isinstance(docs, list):
             docs = docs[0] if len(docs) > 0 and isinstance(docs[0], list) else docs
         else:
             docs = []
-
         if metas and isinstance(metas, list):
             metas = metas[0] if len(metas) > 0 and isinstance(metas[0], list) else metas
         else:
@@ -33,37 +31,27 @@ def hybrid_search(query):
         metas = []
 
     for doc, meta in zip(docs, metas):
-
-        semantic_docs.append({
-            "document": doc,
-            "metadata": meta,
-            "source": "semantic"
-        })
-
+        semantic_docs.append({"document": doc,"metadata": meta,"source": "semantic"})
     keyword_docs = keyword_search(query)
-
     combined = semantic_docs + keyword_docs
-
     # ✅ deduplicate
     unique = {}
 
     for item in combined:
         unique[item["document"]] = item
-
     final_docs = list(unique.values())
-
     # ✅ rerank
-    reranked = rerank_results(
-        query,
-        final_docs
-    )
+    reranked = rerank_results(query,final_docs)
 
     # ✅ MUST RETURN LIST
     expanded_results = []
     for r in reranked[:5]:
         expanded_results.append(r)
         metadata = r["metadata"]
-        table_id = metadata["table_id"]
+        table_id = metadata.get("table_id")
+        if not table_id:
+            continue
+
         row_index = metadata.get("row_index",0)
         neighbors = get_neighbor_chunks(table_id=table_id,row_index=row_index,window=2)
 

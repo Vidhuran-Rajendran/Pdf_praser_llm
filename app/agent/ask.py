@@ -22,6 +22,16 @@ def ask_question(query):
     results = tool_output["results"]
     # ✅ APPLY DVP FILTER HERE
     filtered_results = filter_by_dvp(query, results)
+    
+    # ✅ ADD THIS (IMPORTANT)
+    image_results = [
+        r for r in results
+        if r["metadata"].get("source") == "image"
+    ]
+
+    # ✅ ADD images back for graph queries
+    filtered_results.extend(image_results)
+
     cleaned_chunks = deduplicate_context(filtered_results)
     context = build_structured_context(cleaned_chunks)
     prompt = build_reasoning_prompt(query,context)

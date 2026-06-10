@@ -1672,6 +1672,16 @@ def ask_question(query):
     results = tool_output["results"]
     # ✅ APPLY DVP FILTER HERE
     filtered_results = filter_by_dvp(query, results)
+    
+    # ✅ ADD THIS (IMPORTANT)
+    image_results = [
+        r for r in results
+        if r["metadata"].get("source") == "image"
+    ]
+
+    # ✅ ADD images back for graph queries
+    filtered_results.extend(image_results)
+
     cleaned_chunks = deduplicate_context(filtered_results)
     context = build_structured_context(cleaned_chunks)
     prompt = build_reasoning_prompt(query,context)
@@ -2049,46 +2059,56 @@ def create_embedding(text):
 
 
 ------------------------------------------------------------
+FILE: image_processor.py
+------------------------------------------------------------
+import easyocr
+
+# ✅ load once
+reader = easyocr.Reader(['en'], gpu=False)
+
+
+def extract_text_from_image(image_path):
+
+    result = reader.readtext(image_path)
+
+    text_blocks = [r["text"] if isinstance(r, dict) else r[1] for r in result]
+
+    return " ".join(text_blocks)
+
+
+
+------------------------------------------------------------
 FILE: vectordb.py
 ------------------------------------------------------------
 import chromadb
 from app.embeddings.embedder import create_embedding
 
 client = chromadb.PersistentClient(path="./chroma_db")
-
-collection = client.get_or_create_collection(name="dvp_tables", 
-                                             embedding_function=None)
-
+collection = client.get_or_create_collection(name="dvp_tables", embedding_function=None)
 
 def store_chunks(chunks):
-
     ids = []
     docs = []
     metas = []
     embeddings = []
 
     for chunk in chunks:
-
         ids.append(chunk["id"])
-
         docs.append(chunk["text"])
-
         metas.append(chunk["metadata"])
 
         # ✅ YOUR BGE EMBEDDING
-        emb = create_embedding(
-            chunk["text"]
-        )
-
+        emb = create_embedding(chunk["text"])
         embeddings.append(emb)
 
     # ✅ pass embeddings manually
-    collection.add(
-        ids=ids,
+    collection.add(ids=ids,
         documents=docs,
         metadatas=metas,
         embeddings=embeddings
     )
+    
+
 
 
 ================================================================================
@@ -2119,7 +2139,7 @@ def ingest_folder(folder_path):
 ------------------------------------------------------------
 FILE: pipeline.py
 ------------------------------------------------------------
-import re,os
+import os
 from collections import Counter
 from app.parser.page_builder import build_page_view
 from app.parser.pdfplumber_table import extract_tables_pdf
@@ -2129,6 +2149,8 @@ from app.embeddings.chunker import dataframe_to_chunks,chunk_text_pages
 from app.embeddings.vectordb import store_chunks
 from app.storage.duckdb_store import initialize_db,insert_chunks
 from app.parser.camelot_parser import extract_tables_camelot
+from app.parser.image_extractor import extract_images
+from app.embeddings.image_processor import extract_text_from_image
 
 
 
@@ -2141,23 +2163,45 @@ def process_pdf(file_path):
     raw_tables = extract_tables_camelot(file_path)
     normalized_tables = normalize_tables(raw_tables)
     useful_tables = filter_useful_tables(normalized_tables)
+    images = extract_images(file_path)
     
     all_chunks = []
+    image_chunks = []
+
+    for img in images:
+        text = extract_text_from_image(img["path"])
+        
+        chunk = {
+                "id": f"image_{img['page']}_{len(image_chunks)}",
+                "text": text,
+                "metadata": {
+                    "page": img["page"],
+                    "project": project_name,
+                    "dvp_text": dvp_text,
+                    "source": "image"
+                }
+            }
+
+        image_chunks.append(chunk)
+
+    
     for table in useful_tables:
         chunks = dataframe_to_chunks(table)        
         for c in chunks:
             c["metadata"]["project"] = project_name
             c["metadata"]["dvp_text"] = dvp_text
         all_chunks.extend(chunks)
-        text_chunks = chunk_text_pages(pages)
-        
-        for t in text_chunks:
-            t["metadata"]["project"] = project_name
-            t["metadata"]["dvp_text"] = dvp_text
-    store_chunks(all_chunks)
+    text_chunks = chunk_text_pages(pages)
+    
+    for t in text_chunks:
+        t["metadata"]["project"] = project_name
+        t["metadata"]["dvp_text"] = dvp_text
+    combined_chunks = all_chunks + text_chunks + image_chunks
+
+    store_chunks(combined_chunks)
     
     initialize_db()
-    insert_chunks(all_chunks)
+    insert_chunks(combined_chunks)
 
     return {
         "pages": pages,
@@ -2194,7 +2238,6 @@ def extract_dvp_text(pages, file_path):
    for line in text_lines:
        if "evaluation" in line.lower() or "test" in line.lower():
            return line.strip()
-   import os
    return os.path.basename(file_path).replace(".pdf", "")
 
 
@@ -2359,6 +2402,40 @@ def gcp_table_extract(file_path):
                 })
 
     return tables
+
+
+
+------------------------------------------------------------
+FILE: image_extractor.py
+------------------------------------------------------------
+import fitz
+import os
+
+
+def extract_images(pdf_path, output_folder="images"):
+
+    os.makedirs(output_folder, exist_ok=True)
+
+    doc = fitz.open(pdf_path)
+    images = []
+
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        img_list = page.get_images(full=True)
+
+        for idx, img in enumerate(img_list):
+            xref = img[0]
+            base_image = doc.extract_image(xref)
+            image_bytes = base_image["image"]
+            ext = base_image["ext"]
+            file_name = f"{output_folder}/page_{page_num}_{idx}.{ext}"
+
+            with open(file_name, "wb") as f:
+                f.write(image_bytes)
+
+            images.append({"path": file_name,"page": page_num})
+
+    return images
 
 
 
@@ -3076,13 +3153,11 @@ def hybrid_search(query):
     if semantic and isinstance(semantic, dict):
         docs = semantic.get("documents")
         metas = semantic.get("metadatas")
-
         # documents/metadatas expected to be lists of lists; try to extract first inner list
         if docs and isinstance(docs, list):
             docs = docs[0] if len(docs) > 0 and isinstance(docs[0], list) else docs
         else:
             docs = []
-
         if metas and isinstance(metas, list):
             metas = metas[0] if len(metas) > 0 and isinstance(metas[0], list) else metas
         else:
@@ -3092,37 +3167,27 @@ def hybrid_search(query):
         metas = []
 
     for doc, meta in zip(docs, metas):
-
-        semantic_docs.append({
-            "document": doc,
-            "metadata": meta,
-            "source": "semantic"
-        })
-
+        semantic_docs.append({"document": doc,"metadata": meta,"source": "semantic"})
     keyword_docs = keyword_search(query)
-
     combined = semantic_docs + keyword_docs
-
     # ✅ deduplicate
     unique = {}
 
     for item in combined:
         unique[item["document"]] = item
-
     final_docs = list(unique.values())
-
     # ✅ rerank
-    reranked = rerank_results(
-        query,
-        final_docs
-    )
+    reranked = rerank_results(query,final_docs)
 
     # ✅ MUST RETURN LIST
     expanded_results = []
     for r in reranked[:5]:
         expanded_results.append(r)
         metadata = r["metadata"]
-        table_id = metadata["table_id"]
+        table_id = metadata.get("table_id")
+        if not table_id:
+            continue
+
         row_index = metadata.get("row_index",0)
         neighbors = get_neighbor_chunks(table_id=table_id,row_index=row_index,window=2)
 
@@ -3474,7 +3539,7 @@ def insert_chunks(chunks):
        """, (
            chunk["id"],
            chunk["metadata"]["page"],
-           chunk["metadata"]["table_id"],
+           chunk["metadata"].get("table_id", "N/A"),
            chunk["metadata"].get("row_index", 0),
            chunk["text"]
        ))
@@ -7389,6 +7454,11 @@ FOLDER: E:\New folder\Pdf_praser_llm\data
 
 ================================================================================
 FOLDER: E:\New folder\Pdf_praser_llm\eenv
+================================================================================
+
+
+================================================================================
+FOLDER: E:\New folder\Pdf_praser_llm\images
 ================================================================================
 
 
