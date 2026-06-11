@@ -1,7 +1,11 @@
 import fitz
 import os
 
-def extract_images(pdf_path, output_folder="images"):
+def extract_images(pdf_path, base_output="images"):
+
+    # ✅ create separate folder per PDF
+    pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
+    output_folder = os.path.join(base_output, pdf_name)
 
     os.makedirs(output_folder, exist_ok=True)
 
@@ -12,34 +16,40 @@ def extract_images(pdf_path, output_folder="images"):
 
         page = doc[page_num]
 
-        # ✅ use get_images instead of text blocks
-        img_list = page.get_images(full=True)
+        # ✅ render full page (better quality)
+        pix_full = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+        full_img_path = f"{output_folder}/page_{page_num}_full.png"
+        pix_full.save(full_img_path)
 
-        for idx, img in enumerate(img_list):
+        # ✅ detect blocks (layout based)
+        blocks = page.get_text("blocks")
 
-            xref = img[0]
+        for i, b in enumerate(blocks):
 
-            base_image = doc.extract_image(xref)
-            image_bytes = base_image["image"]
-            ext = base_image["ext"]
+            x0, y0, x1, y1, text, *_ = b
+            x0, y0, x1, y1 = map(float, (x0, y0, x1, y1))
 
-            width = img[2]
-            height = img[3]
+            width = x1 - x0
+            height = y1 - y0
 
-            # ✅ filter unwanted images (logos / icons)
-            if width < 300 or height < 200:
+            # ✅ relaxed filter (important)
+            if width < 150 or height < 120:
                 continue
 
-            img_path = f"{output_folder}/page_{page_num}_{idx}.{ext}"
+            # ✅ remove noise (logos / random letters)
+            if len(text.strip()) < 10:
+                continue
 
-            with open(img_path, "wb") as f:
-                f.write(image_bytes)
+            rect = fitz.Rect(x0, y0, x1, y1)
+
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), clip=rect)
+
+            img_path = f"{output_folder}/page_{page_num}_{i}.png"
+            pix.save(img_path)
 
             images.append({
                 "path": img_path,
-                "page": page_num,
-                "width": width,
-                "height": height
+                "page": page_num
             })
 
     return images

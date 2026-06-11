@@ -16,3 +16,12 @@ def route_query(query):
             return "sql"
 
     return "rag"
+def detect_dvp(query, available_dvps):
+
+    query_lower = query.lower()
+
+    for dvp in available_dvps:
+        if any(word in dvp.lower() for word in query_lower.split()):
+            return dvp
+
+    return None

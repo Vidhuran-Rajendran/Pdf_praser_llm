@@ -1648,106 +1648,192 @@ FOLDER: E:\New folder\Pdf_praser_llm\app\agent
 ------------------------------------------------------------
 FILE: ask.py
 ------------------------------------------------------------
+# import ollama
+# import re
+# from app.agent.graph import run_agent
+# from app.memory.session_memory import add_message
+# from app.context.query_rewritter import rewrite_query
+# from app.context.context_deduplicator import deduplicate_context
+# from app.context.context_builder import build_structured_context
+# from app.context.reasoning_prompt import build_reasoning_prompt
+
+# from app.embeddings.embedder import create_embedding
+# from sklearn.metrics.pairwise import cosine_similarity
+# import numpy as np
+
+
+
+# def ask_question(query):
+
+#     tool_output = run_agent(query)
+#     is_compare = "compare" in query.lower()
+#     results = tool_output["results"]
+
+#     # ✅ STRICT DOCUMENT LOCK
+#     query_lower = query.lower()
+#     matched_docs = []
+
+#     for r in results:
+#         dvp = r["metadata"].get("dvp_text", "").lower()
+#         if any(word in dvp for word in query_lower.split()):
+#             matched_docs.append(r["metadata"]["doc_id"])
+
+#     if matched_docs:
+#         best_doc = matched_docs[0]   # ✅ PRIORITY
+#     else:
+#         # fallback normal logic
+#         doc_scores = {}
+#         for r in results:
+#             doc = r["metadata"].get("doc_id")
+#             if doc is None:
+#                 continue
+#             doc_scores[doc] = doc_scores.get(doc, 0) + 1
+#         best_doc = max(doc_scores.items(), key=lambda item: item[1])[0]
+
+#     filtered_results = [r for r in results if r["metadata"].get("doc_id") == best_doc]
+    
+#     if is_compare:
+#         filtered_results = results[:10]   # ✅ multi-doc
+#     else:
+#         filtered_results = [r for r in results if r["metadata"].get("doc_id") == best_doc]
+
+#     cleaned_chunks = deduplicate_context(filtered_results)
+#     context = build_structured_context(cleaned_chunks)
+#     prompt = build_reasoning_prompt(query, context)
+    
+#     response = ollama.chat(
+#         model="qwen2.5",
+#         messages=[{"role": "user", "content": prompt}]
+#     )
+
+#     answer = response["message"]["content"]
+#     top_meta = filtered_results[0]["metadata"]
+
+#     return f"""
+# 📄 PDF: {top_meta.get("pdf_name")}
+# 📊 DVP: {top_meta.get("dvp_text")}
+# 🖼 Image Path: {top_meta.get("image_path", "N/A")}
+
+# ✅ Answer:
+# {answer}
+# """
+
+
+
+
+# def filter_by_dvp(query, results):
+#     query_emb = np.array(create_embedding(query)).reshape(1, -1)
+#     scored = []
+#     for r in results:
+#         dvp_text = r["metadata"].get("dvp_text")
+#         if not dvp_text:
+#             continue
+#         dvp_emb = np.array(create_embedding(dvp_text)).reshape(1, -1)
+#         score = cosine_similarity(query_emb,dvp_emb)[0][0]
+#         # if score<0.5:
+#         #     continue
+#         scored.append((score, r))
+
+#     scored.sort(reverse=True, key=lambda x: x[0])
+
+#     return [r for s, r in scored[:5]]
+
+
+
+
+# def detect_project(query):
+#     match = re.search(r"\b[A-Z]{1,4}\d{2,4}\b",query.upper())
+
+#     if match:
+#         return match.group(0)
+
+#     return None
+
 import ollama
-import re
+
 from app.agent.graph import run_agent
-from app.memory.session_memory import add_message
-from app.context.query_rewritter import rewrite_query
-from app.context.context_deduplicator import deduplicate_context
-from app.context.context_builder import build_structured_context
-from app.context.reasoning_prompt import build_reasoning_prompt
+from app.memory.session_memory import set_last_dvp, get_last_dvp
 
-from app.embeddings.embedder import create_embedding
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
+# ✅ simple dvp matcher
+def detect_dvp(query, dvps):
 
+    query_lower = query.lower()
+
+    for dvp in dvps:
+        if any(word in dvp.lower() for word in query_lower.split()):
+            return dvp
+
+    return None
 
 
 def ask_question(query):
 
     tool_output = run_agent(query)
-    is_compare = "compare" in query.lower()
     results = tool_output["results"]
 
-    # ✅ STRICT DOCUMENT LOCK
-    query_lower = query.lower()
-    matched_docs = []
+    # ✅ extract dvp list
+    dvps = list(set(
+        r["metadata"].get("dvp_text", "")
+        for r in results if r["metadata"].get("dvp_text")
+    ))
 
-    for r in results:
-        dvp = r["metadata"].get("dvp_text", "").lower()
-        if any(word in dvp for word in query_lower.split()):
-            matched_docs.append(r["metadata"]["doc_id"])
+    # ✅ detect dvp from query
+    dvp = detect_dvp(query, dvps)
 
-    if matched_docs:
-        best_doc = matched_docs[0]   # ✅ PRIORITY
-    else:
-        # fallback normal logic
-        doc_scores = {}
-        for r in results:
-            doc = r["metadata"].get("doc_id")
-            if doc is None:
-                continue
-            doc_scores[doc] = doc_scores.get(doc, 0) + 1
-        best_doc = max(doc_scores.items(), key=lambda item: item[1])[0]
+    # ✅ fallback to memory
+    if not dvp:
+        dvp = get_last_dvp()
 
-    filtered_results = [r for r in results if r["metadata"].get("doc_id") == best_doc]
-    
+    # ✅ check compare mode
+    is_compare = "compare" in query.lower()
+
     if is_compare:
-        filtered_results = results[:10]   # ✅ multi-doc
-    else:
-        filtered_results = [r for r in results if r["metadata"].get("doc_id") == best_doc]
+        filtered_results = results[:12]
 
-    cleaned_chunks = deduplicate_context(filtered_results)
-    context = build_structured_context(cleaned_chunks)
-    prompt = build_reasoning_prompt(query, context)
-    
+    elif dvp:
+        filtered_results = [
+            r for r in results
+            if dvp.lower() in r["metadata"].get("dvp_text", "").lower()
+        ]
+        set_last_dvp(dvp)
+
+    else:
+        filtered_results = results
+
+    # ✅ build context
+    context = "\n\n".join([
+        r["text"] for r in filtered_results[:5]
+    ])
+
     response = ollama.chat(
         model="qwen2.5",
-        messages=[{"role": "user", "content": prompt}]
+        messages=[
+            {
+                "role": "user",
+                "content": f"""
+Answer based ONLY on this context:
+
+{context}
+
+Question: {query}
+"""
+            }
+        ]
     )
 
     answer = response["message"]["content"]
+
+    # ✅ source trace
     top_meta = filtered_results[0]["metadata"]
 
     return f"""
 📄 PDF: {top_meta.get("pdf_name")}
 📊 DVP: {top_meta.get("dvp_text")}
-🖼 Image Path: {top_meta.get("image_path", "N/A")}
+🖼 Image: {top_meta.get("image_path", "N/A")}
 
 ✅ Answer:
 {answer}
 """
-
-
-
-
-def filter_by_dvp(query, results):
-    query_emb = np.array(create_embedding(query)).reshape(1, -1)
-    scored = []
-    for r in results:
-        dvp_text = r["metadata"].get("dvp_text")
-        if not dvp_text:
-            continue
-        dvp_emb = np.array(create_embedding(dvp_text)).reshape(1, -1)
-        score = cosine_similarity(query_emb,dvp_emb)[0][0]
-        # if score<0.5:
-        #     continue
-        scored.append((score, r))
-
-    scored.sort(reverse=True, key=lambda x: x[0])
-
-    return [r for s, r in scored[:5]]
-
-
-
-
-def detect_project(query):
-    match = re.search(r"\b[A-Z]{1,4}\d{2,4}\b",query.upper())
-
-    if match:
-        return match.group(0)
-
-    return None
 
 
 ------------------------------------------------------------
@@ -1787,6 +1873,15 @@ def route_query(query):
             return "sql"
 
     return "rag"
+def detect_dvp(query, available_dvps):
+
+    query_lower = query.lower()
+
+    for dvp in available_dvps:
+        if any(word in dvp.lower() for word in query_lower.split()):
+            return dvp
+
+    return None
 
 
 ------------------------------------------------------------
@@ -2192,131 +2287,297 @@ def ingest_folder(folder_path):
 ------------------------------------------------------------
 FILE: pipeline.py
 ------------------------------------------------------------
+# import os
+# from collections import Counter
+# from app.parser.page_builder import build_page_view
+# from app.parser.pdfplumber_table import extract_tables_pdf
+# from app.parser.table_normalizer import normalize_tables
+# from app.parser.quality_scorer import filter_useful_tables
+# from app.embeddings.chunker import dataframe_to_chunks,chunk_text_pages
+# from app.embeddings.vectordb import store_chunks
+# from app.storage.duckdb_store import initialize_db,insert_chunks
+# from app.parser.camelot_parser import extract_tables_camelot
+# from app.parser.image_extractor import extract_images
+# from app.embeddings.image_processor import extract_text_from_image
+
+
+
+# def process_pdf(file_path):
+
+#     pages = build_page_view(file_path)
+#     project_name = extract_project_name(pages)
+#     print(f"✅ Project detected: {project_name}")
+#     dvp_text = extract_dvp_text(pages, file_path)
+#     raw_tables = extract_tables_camelot(file_path)
+#     normalized_tables = normalize_tables(raw_tables)
+#     useful_tables = filter_useful_tables(normalized_tables)
+#     images = extract_images(file_path)
+    
+#     all_chunks = []
+#     image_chunks = []
+
+#     for img in images:
+        
+#         ocr_text = extract_text_from_image(img["path"])
+
+#         # ✅ extract title (first line usually)
+#         lines = [l.strip() for l in ocr_text.split("\n") if l.strip()]
+#         title = lines[0] if lines else "unknown graph"
+
+#         TEXT = f"""
+#         Graph Title: {title}
+
+#         {dvp_text}
+#         Project: {project_name}
+
+#         Data:
+#         {ocr_text}
+#         """
+
+
+        
+#         chunk = {
+#                 "id": f"image_{img['page']}_{len(image_chunks)}",
+#                 "text": TEXT,
+#                 "metadata": {
+#                     "page": img["page"],
+#                     "project": project_name,
+#                     "dvp_text": dvp_text,
+#                     "doc_id": file_path,
+#                     "pdf_name": os.path.basename(file_path),
+#                     "image_path": img["path"],
+#                     "graph_title": title,
+#                     "source": "image"
+#                 }
+#             }
+
+#         image_chunks.append(chunk)
+
+    
+#     for table in useful_tables:
+#         chunks = dataframe_to_chunks(table,file_path)        
+#         for c in chunks:
+#             c["metadata"]["project"] = project_name
+#             c["metadata"]["dvp_text"] = dvp_text            
+#             c["metadata"]["pdf_name"] = os.path.basename(file_path)
+#             c["metadata"]["doc_id"] = file_path
+
+#         all_chunks.extend(chunks)
+#     text_chunks = chunk_text_pages(pages)
+    
+#     for t in text_chunks:
+#         t["metadata"]["project"] = project_name
+#         t["metadata"]["dvp_text"] = dvp_text
+#         t["metadata"]["pdf_name"] = os.path.basename(file_path)
+#         t["metadata"]["doc_id"] = file_path
+
+#     combined_chunks = all_chunks + text_chunks + image_chunks
+
+#     store_chunks(combined_chunks)
+    
+#     initialize_db()
+#     insert_chunks(combined_chunks)
+
+#     return {
+#         "pages": pages,
+#         "tables": useful_tables,
+#         "chunks": all_chunks
+#     }
+
+
+
+# def extract_project_name(pages):
+#     for page in pages[:5]:
+#         for item in page["content"]:
+#             if item["type"] == "text":
+#                 line = item["value"]
+
+#                 if "project no" in line.lower():
+#                     import re
+#                     match = re.search(
+#                         r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
+#                         line, re.IGNORECASE
+#                     )
+#                     if match:
+#                         return match.group(1).upper()
+
+#     return "UNKNOWN_PROJECT"
+
+
+# def extract_dvp_text(pages, file_path):
+
+#     for item in pages[0]["content"]:
+#         if item["type"] == "text":
+#             line = item["value"]
+
+#             if "evaluation" in line.lower() or "test" in line.lower():
+#                 return line.strip()
 import os
-from collections import Counter
+import fitz
+
 from app.parser.page_builder import build_page_view
-from app.parser.pdfplumber_table import extract_tables_pdf
+from app.parser.camelot_parser import extract_tables_camelot
 from app.parser.table_normalizer import normalize_tables
 from app.parser.quality_scorer import filter_useful_tables
-from app.embeddings.chunker import dataframe_to_chunks,chunk_text_pages
+
+from app.embeddings.chunker import dataframe_to_chunks, chunk_text_pages
 from app.embeddings.vectordb import store_chunks
-from app.storage.duckdb_store import initialize_db,insert_chunks
-from app.parser.camelot_parser import extract_tables_camelot
-from app.parser.image_extractor import extract_images
-from app.embeddings.image_processor import extract_text_from_image
+from app.storage.duckdb_store import initialize_db, insert_chunks
+
+from app.vlm.vlm_runner import run_vlm
 
 
+# ✅ FULL PAGE IMAGE EXTRACTION (FINAL)
+def extract_full_pages(pdf_path, base_output="images"):
 
+    pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
+    folder = os.path.join(base_output, pdf_name)
+
+    os.makedirs(folder, exist_ok=True)
+
+    doc = fitz.open(pdf_path)
+    pages = []
+
+    # fitz.Document may not implement the iterator protocol for some type checkers.
+    # Use explicit page indices to avoid typing issues.
+    for i in range(doc.page_count):
+        page = doc.load_page(i)
+
+        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+
+        path = f"{folder}/page_{i}.png"
+        pix.save(path)
+
+        pages.append({
+            "path": path,
+            "page": i
+        })
+
+    return pages
+
+
+# ✅ PROJECT EXTRACT
+def extract_project_name(pages):
+
+    import re
+
+    for page in pages[:5]:
+        text = page["text"]
+
+        match = re.search(
+            r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
+            text,
+            re.IGNORECASE
+        )
+
+        if match:
+            return match.group(1).upper()
+
+    return "UNKNOWN"
+
+
+# ✅ DVP TEXT
+def extract_dvp_text(pages, file_path):
+
+    first_page = pages[0]["text"]
+
+    for line in first_page.split("\n"):
+        if "evaluation" in line.lower() or "test" in line.lower():
+            return line.strip()
+
+    return os.path.basename(file_path).replace(".pdf", "")
+
+
+# ✅ MAIN PIPELINE
 def process_pdf(file_path):
 
     pages = build_page_view(file_path)
+
     project_name = extract_project_name(pages)
-    print(f"✅ Project detected: {project_name}")
     dvp_text = extract_dvp_text(pages, file_path)
+    pdf_name = os.path.basename(file_path)
+
+    print(f"✅ Processing: {pdf_name}")
+    print(f"Project: {project_name}, DVP: {dvp_text}")
+
+    # ✅ tables
     raw_tables = extract_tables_camelot(file_path)
     normalized_tables = normalize_tables(raw_tables)
     useful_tables = filter_useful_tables(normalized_tables)
-    images = extract_images(file_path)
-    
+
+    # ✅ images (full pages)
+    images = extract_full_pages(file_path)
+
     all_chunks = []
     image_chunks = []
 
+    # ✅ IMAGE CHUNKS (FOR VLM)
     for img in images:
         
-        ocr_text = extract_text_from_image(img["path"])
+        print(f"🔍 VLM on page {img['page']}")
 
-        # ✅ extract title (first line usually)
-        lines = ocr_text.split("\n")
-        title = lines[0] if lines else "unknown graph"
-
-        TEXT = f"""
-        Graph Title: {title}
-
-        {dvp_text}
-        Project: {project_name}
-
-        Data:
-        {ocr_text}
-        """
+        vlm_text = run_vlm(img["path"])
 
 
         
+        TEXT = f"""
+Engineering Page Understanding:
+
+{vlm_text}
+
+DVP: {dvp_text}
+Project: {project_name}
+Page: {img['page']}
+"""
+
         chunk = {
-                "id": f"image_{img['page']}_{len(image_chunks)}",
-                "text": TEXT,
-                "metadata": {
-                    "page": img["page"],
-                    "project": project_name,
-                    "dvp_text": dvp_text,
-                    "doc_id": file_path,
-                    "pdf_name": os.path.basename(file_path),
-                    "image_path": img["path"],
-                    "graph_title": title,
-                    "source": "image"
-                }
+            "id": f"image_{img['page']}",
+            "text": TEXT,
+            "metadata": {
+                "page": img["page"],
+                "project": project_name,
+                "dvp_text": dvp_text,
+                "doc_id": file_path,
+                "pdf_name": pdf_name,
+                "image_path": img["path"],
+                "source": "image"
             }
+        }
 
         image_chunks.append(chunk)
 
-    
+
+    # ✅ TABLE CHUNKS
     for table in useful_tables:
-        chunks = dataframe_to_chunks(table,file_path)        
+
+        chunks = dataframe_to_chunks(table, file_path)
+
         for c in chunks:
             c["metadata"]["project"] = project_name
-            c["metadata"]["dvp_text"] = dvp_text            
-            c["metadata"]["pdf_name"] = os.path.basename(file_path)
+            c["metadata"]["dvp_text"] = dvp_text
             c["metadata"]["doc_id"] = file_path
+            c["metadata"]["pdf_name"] = pdf_name
 
         all_chunks.extend(chunks)
+
+    # ✅ TEXT CHUNKS
     text_chunks = chunk_text_pages(pages)
-    
+
     for t in text_chunks:
         t["metadata"]["project"] = project_name
         t["metadata"]["dvp_text"] = dvp_text
-        t["metadata"]["pdf_name"] = os.path.basename(file_path)
         t["metadata"]["doc_id"] = file_path
+        t["metadata"]["pdf_name"] = pdf_name
 
     combined_chunks = all_chunks + text_chunks + image_chunks
 
+    # ✅ STORE
     store_chunks(combined_chunks)
-    
+
     initialize_db()
     insert_chunks(combined_chunks)
 
-    return {
-        "pages": pages,
-        "tables": useful_tables,
-        "chunks": all_chunks
-    }
-
-
-
-def extract_project_name(pages):
-    for page in pages[:5]:
-        for item in page["content"]:
-            if item["type"] == "text":
-                line = item["value"]
-
-                if "project no" in line.lower():
-                    import re
-                    match = re.search(
-                        r"project\s*no\s*[:\-]?\s*([A-Z0-9\-]+)",
-                        line, re.IGNORECASE
-                    )
-                    if match:
-                        return match.group(1).upper()
-
-    return "UNKNOWN_PROJECT"
-
-
-def extract_dvp_text(pages, file_path):
-
-    for item in pages[0]["content"]:
-        if item["type"] == "text":
-            line = item["value"]
-
-            if "evaluation" in line.lower() or "test" in line.lower():
-                return line.strip()
+    return combined_chunks
 
 
 
@@ -2353,6 +2614,15 @@ def get_history():
 
 def clear_history():
     conversation_history.clear()
+    
+memory_store = {}
+
+def set_last_dvp(dvp):
+    memory_store["last_dvp"] = dvp
+
+def get_last_dvp():
+    return memory_store.get("last_dvp")
+
 
 
 ================================================================================
@@ -2490,7 +2760,11 @@ FILE: image_extractor.py
 import fitz
 import os
 
-def extract_images(pdf_path, output_folder="images"):
+def extract_images(pdf_path, base_output="images"):
+
+    # ✅ create separate folder per PDF
+    pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
+    output_folder = os.path.join(base_output, pdf_name)
 
     os.makedirs(output_folder, exist_ok=True)
 
@@ -2501,34 +2775,40 @@ def extract_images(pdf_path, output_folder="images"):
 
         page = doc[page_num]
 
-        # ✅ use get_images instead of text blocks
-        img_list = page.get_images(full=True)
+        # ✅ render full page (better quality)
+        pix_full = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+        full_img_path = f"{output_folder}/page_{page_num}_full.png"
+        pix_full.save(full_img_path)
 
-        for idx, img in enumerate(img_list):
+        # ✅ detect blocks (layout based)
+        blocks = page.get_text("blocks")
 
-            xref = img[0]
+        for i, b in enumerate(blocks):
 
-            base_image = doc.extract_image(xref)
-            image_bytes = base_image["image"]
-            ext = base_image["ext"]
+            x0, y0, x1, y1, text, *_ = b
+            x0, y0, x1, y1 = map(float, (x0, y0, x1, y1))
 
-            width = img[2]
-            height = img[3]
+            width = x1 - x0
+            height = y1 - y0
 
-            # ✅ filter unwanted images (logos / icons)
-            if width < 300 or height < 200:
+            # ✅ relaxed filter (important)
+            if width < 150 or height < 120:
                 continue
 
-            img_path = f"{output_folder}/page_{page_num}_{idx}.{ext}"
+            # ✅ remove noise (logos / random letters)
+            if len(text.strip()) < 10:
+                continue
 
-            with open(img_path, "wb") as f:
-                f.write(image_bytes)
+            rect = fitz.Rect(x0, y0, x1, y1)
+
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), clip=rect)
+
+            img_path = f"{output_folder}/page_{page_num}_{i}.png"
+            pix.save(img_path)
 
             images.append({
                 "path": img_path,
-                "page": page_num,
-                "width": width,
-                "height": height
+                "page": page_num
             })
 
     return images
@@ -3700,6 +3980,78 @@ FOLDER: E:\New folder\Pdf_praser_llm\app\utils
 FILE: __init__.py
 ------------------------------------------------------------
 
+
+
+================================================================================
+FOLDER: E:\New folder\Pdf_praser_llm\app\vlm
+================================================================================
+
+
+------------------------------------------------------------
+FILE: vlm_runner.py
+------------------------------------------------------------
+from transformers import AutoProcessor, AutoModel
+from PIL import Image
+import torch
+
+MODEL_PATH = r"E:\New folder\Pdf_praser_llm\model\qwen_2.5_vl"
+
+# ✅ correct model
+model = AutoModel.from_pretrained(
+    MODEL_PATH,
+    device_map="cpu",
+    trust_remote_code=True,
+    local_files_only=True
+)
+
+processor = AutoProcessor.from_pretrained(
+    MODEL_PATH,
+    trust_remote_code=True,
+    device_map="cpu",
+    local_files_only=True
+)
+
+
+def run_vlm(image_path):
+
+    image = Image.open(image_path).convert("RGB")
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": image},
+                {"type": "text", "text": "Explain this engineering graph with values and trends."}
+            ]
+        }
+    ]
+
+    text = processor.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+
+    inputs = processor(
+        text=[text],
+        images=[image],
+        return_tensors="pt"
+    )
+
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+    with torch.no_grad():
+        output = model.generate(
+            **inputs,
+            max_new_tokens=300
+        )
+
+    return processor.batch_decode(output, skip_special_tokens=True)[0]
+
+
+================================================================================
+FOLDER: E:\New folder\Pdf_praser_llm\app\vlm\__pycache__
+================================================================================
 
 
 ================================================================================
@@ -7549,11 +7901,6 @@ FOLDER: E:\New folder\Pdf_praser_llm\data
 
 ================================================================================
 FOLDER: E:\New folder\Pdf_praser_llm\eenv
-================================================================================
-
-
-================================================================================
-FOLDER: E:\New folder\Pdf_praser_llm\images
 ================================================================================
 
 
