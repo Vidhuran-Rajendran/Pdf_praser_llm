@@ -1,11 +1,12 @@
-from transformers import AutoProcessor, AutoModel
+from typing import Any
+from transformers import AutoModelForCausalLM, AutoProcessor
 from PIL import Image
 import torch
 
-MODEL_PATH = r"E:\New folder\Pdf_praser_llm\model\qwen_2.5_vl"
+MODEL_PATH = r"E:\New folder\Pdf_praser_llm\model\qwen2.5_vlm"
 
 # ✅ correct model
-model = AutoModel.from_pretrained(
+model: Any = AutoModelForCausalLM.from_pretrained(
     MODEL_PATH,
     device_map="cpu",
     trust_remote_code=True,

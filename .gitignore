@@ -8,6 +8,10 @@ __pycache__/
 eenv/
 .model/
 model/
+.images/
+images/
+.data/
+data/
 # OS/editor
 .DS_Store
 .vscode/

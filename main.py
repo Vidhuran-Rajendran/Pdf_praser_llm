@@ -47,7 +47,7 @@ def db_has_data():
        result = conn.execute(
            "SELECT COUNT(*) FROM engineering_chunks"
        ).fetchone()
-       return result[0] > 0
+       return bool(result and result[0])
    except:
        return False
 
