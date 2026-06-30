@@ -43,10 +43,7 @@ def process_pdf(file_path):
 
         Data:
         {ocr_text}
-        """
-
-
-        
+        """        
         chunk = {
                 "id": f"image_{img['page']}_{len(image_chunks)}",
                 "text": TEXT,
@@ -94,8 +91,6 @@ def process_pdf(file_path):
         "tables": useful_tables,
         "chunks": all_chunks
     }
-
-
 
 def extract_project_name(pages):
     for page in pages[:5]:

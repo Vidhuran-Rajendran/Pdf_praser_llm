@@ -11,8 +11,6 @@ from app.embeddings.embedder import create_embedding
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-
-
 def ask_question(query):
 
     tool_output = run_agent(query)
@@ -67,9 +65,6 @@ def ask_question(query):
 ✅ Answer:
 {answer}
 """
-
-
-
 
 def filter_by_dvp(query, results):
     query_emb = np.array(create_embedding(query)).reshape(1, -1)
